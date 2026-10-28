@@ -39,7 +39,7 @@ Make sure these four are in the list:
 - `claude-opus-5-5-medium`
 
 ## Step 4. Copy the files into your project
-Get the `module-6` folder inside your project folder: unzip `module-6-files.zip`, or copy the `modules/module-6` folder from this repo and keep the name `module-6`. Then open a terminal in the project folder (the one that contains `module-6`).
+Get the `module-6` folder inside your project folder: unzip `module-6-files.zip`, or copy this folder (the one with this README) into your project and rename it `module-6`. Then open a terminal in the project folder (the one that contains `module-6`).
 
 You are copying:
 - `CLAUDE.md` and `AGENTS.md` to the project root.
