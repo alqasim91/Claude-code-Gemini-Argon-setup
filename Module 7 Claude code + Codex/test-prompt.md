@@ -31,6 +31,7 @@ Print: files created, whether the self-check passed, issues found and fixed, and
 ## What to check after the run
 
 - A plan table was printed before any work started: id, phase, model with a reason, owned files, after.
+- The plan table shows a score per task (like `A0 N1 C1 R0 S0 V1 D0`), and each route matches the first-match list in `CLAUDE.md`. `TASKS.md` has one line per task.
 - The work was split into phases. Phase 0 holds the shared design (`styles.css`), and it went to `claude-sonnet-builder` or `claude-opus-builder`. No design work went to a Codex model.
 - Later tasks in one phase were launched together with `scripts/codex-run.sh`, and no two own the same file.
 - Models matched the work: `products.js` and page logic to sol, care guides and copy to terra, scouting checks to luna.

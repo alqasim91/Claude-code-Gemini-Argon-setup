@@ -117,20 +117,36 @@ Model IDs are from learn.chatgpt.com/docs/models, checked 2026-10-29. Astra (`gp
 **Design never goes to a Codex model.** Design shells and first drafts go to Sonnet (high), or Opus (medium) for the most important ones.
 
 ## How tasks are distributed
-| Task type | Goes to |
-|---|---|
-| Small job (~1 file, under ~5 minutes) | One sol-medium run, no phases |
-| Design shell or first design draft | `claude-sonnet-builder` (`claude-opus-builder` for key designs) |
-| Scouting, lookups, read-only | luna-low |
-| Tests, formatting, boilerplate, mechanical edits | luna-medium |
-| Docs, copy, content pages | terra-medium |
-| Standard implementation (default) | sol-medium |
-| Hard: multi-file or tricky logic | sol-high |
-| Security, auth, secrets, unclear spec | Opus writes the spec, `claude-sonnet-builder` builds |
+Opus scores every build task from 0 to 2 on seven dimensions (from Module 3):
+
+| | 0 | 1 | 2 |
+|---|---|---|---|
+| **A** Ambiguity | exact spec, diff describable in one sentence | clear goal, small local choices | open-ended, approach undecided |
+| **N** Novelty | copies an existing pattern | adapts a pattern | no precedent; new abstraction |
+| **C** Coupling | 1–2 files, no shared types | 3+ files or shared type/interface | cross-cutting, public API |
+| **R** Reversibility | `git revert` undoes it | user-visible behavior or config | prod data, releases, money, external side effects |
+| **S** Sensitivity | none | near auth/PII | auth, crypto, secrets, payments, PHI, tenancy |
+| **V** Verifiability | a test/type/lint/build check fully covers it | partly covered | races, performance, security, UX judgment |
+| **D** Diagnosis | cause known / none needed | reproducible, cause unknown | intermittent, prod-only, no repro |
+
+**Small job rule.** If the whole request plans to 2 or fewer build tasks and none scores S = 2 or D = 2, it runs as ONE sol-medium task with the normal review. No scout unless something is unknown.
+
+Otherwise the first match wins:
+0. Read-only (find, explain, research, summarize): luna-low. No review.
+1. Design shell or first design draft: `claude-sonnet-builder` (`claude-opus-builder` for key designs). Never Codex.
+2. S = 2: Opus writes the spec, `claude-sonnet-builder` builds. Opus reviews.
+3. Hard (any of: D = 2, two or more dimensions = 2, A = 2 and C = 2): sol-high. Opus reviews.
+4. Easy (A, R, S, V, D all 0, total 2 or less, spec complete, a tool can verify it): luna-medium.
+5. Docs, copy, content pages: terra-medium.
+6. Otherwise: sol-medium.
+
+Unsure luna or sol? Sol. Unsure sol-medium or sol-high? Sol-medium, unless D = 2.
+
+Opus logs one line per task in `TASKS.md` (`ID | phase | route | score | reviewer | rounds | result | notes`), so you can tune the routing later.
 
 ## A build in 5 beats
 ```
- 1 PLAN        Opus prints a task table: id, phase, model, owned files, after
+ 1 PLAN        Opus prints a task table: id, phase, model, score, owned files, after
       |
  2 PHASE 0     foundation alone (design shell, styles, schema), built by Claude
       |
@@ -138,7 +154,7 @@ Model IDs are from learn.chatgpt.com/docs/models, checked 2026-10-29. Astra (`gp
       |
  4 REVIEW      each phase is reviewed and fixed before the next starts
       |
- 5 SUMMARY     one table: phase, task, model, fallbacks, reviewer, rounds, result
+ 5 SUMMARY     one table: phase, task, score, model, fallbacks, reviewer, rounds, result
 ```
 - **Phases.** If your prompt is not phased, Opus phases it. Phase 0 is the foundation. Each later phase builds on the previous one. A multi-step phase is split into parallel tasks on separate files. A single-step phase is one job.
 - **One owner per file.** Two tasks never touch the same file in a phase.
@@ -150,9 +166,10 @@ Model IDs are from learn.chatgpt.com/docs/models, checked 2026-10-29. Astra (`gp
 | luna or terra | `sonnet-reviewer` |
 | sol medium, diff of 400 changed lines or fewer | `sonnet-reviewer` |
 | sol medium over 400 lines, or sol high | Opus reads the diff itself |
+| Tasks routed by S = 2 or the hard rule | Opus reads the diff itself |
 | Claude builders (design, security) | Opus reads the diff itself |
 
-Opus never spawns a separate Opus reviewer. In the Module 3 cost test, fresh Opus reviewers were 23% of the bill and changed nothing.
+The 400-line rule and the scores come from Module 3. Opus never spawns a separate Opus reviewer. In the Module 3 cost test, fresh Opus reviewers were 23% of the bill and changed nothing.
 
 ## When a review fails (up to 3 rounds)
 | Implementer | Round 1 | Round 2 | Round 3 |

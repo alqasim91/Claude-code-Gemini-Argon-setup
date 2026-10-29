@@ -29,17 +29,32 @@ Claude-plan agents (in `.claude/agents/`):
 | `claude-opus-builder` | opus, effort medium | The most important designs. Round-3 fixes for Sol tasks. Builds and fixes |
 | `sonnet-reviewer` | sonnet | Reviews ONE task's diff, read-only. Returns PASS or FAIL |
 
+## Score every build task (0 / 1 / 2 each, takes 10 seconds)
+Scores come from Module 3. Score each build task before routing it.
+
+| | 0 | 1 | 2 |
+|---|---|---|---|
+| **A** Ambiguity | exact spec, diff describable in one sentence | clear goal, small local choices | open-ended, approach undecided |
+| **N** Novelty | copies an existing pattern | adapts a pattern | no precedent; new abstraction |
+| **C** Coupling | 1–2 files, no shared types | 3+ files or shared type/interface | cross-cutting, public API |
+| **R** Reversibility | `git revert` undoes it | user-visible behavior or config | prod data, releases, money, external side effects |
+| **S** Sensitivity | none | near auth/PII | auth, crypto, secrets, payments, PHI, tenancy |
+| **V** Verifiability | a test/type/lint/build check fully covers it | partly covered | races, performance, security, UX judgment |
+| **D** Diagnosis | cause known / none needed | reproducible, cause unknown | intermittent, prod-only, no repro |
+
 ## Routing (decide per task)
-| Task type | Goes to |
-|---|---|
-| Small job (whole request is ~1 file or under ~5 minutes) | One sol-medium run. No phases. Normal review ladder |
-| Design shell or first design draft | `claude-sonnet-builder` (`claude-opus-builder` for key designs) |
-| Scouting, lookups, read-only | luna-low |
-| Tests, formatting, boilerplate, mechanical edits | luna-medium |
-| Docs, copy, content pages | terra-medium |
-| Standard implementation (default) | sol-medium |
-| Hard: multi-file or tricky logic | sol-high |
-| Security, auth, secrets, unclear spec | Opus writes the spec, `claude-sonnet-builder` builds |
+**Small job (check first).** If the whole request plans to 2 or fewer build tasks and none scores S = 2 or D = 2, run it as ONE sol-medium task with the normal review ladder. No phases. No scout unless something is genuinely unknown.
+
+Otherwise route each task with this list. First match wins.
+0. **Read-only** (find, explain, research, summarize) -> luna-low. No review.
+1. **Design shell or first design draft** -> `claude-sonnet-builder` (`claude-opus-builder` for key designs). Never Codex.
+2. **S = 2** -> Opus writes the spec, `claude-sonnet-builder` builds (security stays on Claude). Opus reviews itself.
+3. **Hard (the Opus trigger).** ANY of: D = 2 · two or more dimensions = 2 · S = 2 and N >= 1 (already caught by 2) · A = 2 and C = 2 -> sol-high. Opus reviews itself.
+4. **Easy.** ALL of: A, R, S, V, D all = 0 · total <= 2 · spec complete · a tool can verify it -> luna-medium.
+5. **Docs, copy, content pages** (prose, not logic) -> terra-medium.
+6. **Otherwise** -> sol-medium.
+
+Tie-breakers: unsure luna vs sol -> sol. Unsure sol-medium vs sol-high -> sol-medium, unless D = 2 -> sol-high.
 
 **Design NEVER goes to a Codex model.** Later mechanical edits to an approved design (copy changes, pages that follow it) may go to sol or luna. Opus does not implement bulk work itself.
 
@@ -52,15 +67,16 @@ If the user's prompt is not already phased, turn it into phases yourself.
 
 Before the first launch, print the plan (no approval needed). Also list fresh quota markers first (see Quota fallback).
 
-| id | phase | model (reason) | owns | after |
-|---|---|---|---|---|
-| p0-shell | 0 | claude-sonnet-builder (design shell) | `site/styles.css` | - |
-| p1-home | 1 | sol-medium (standard, clear spec) | `site/index.html` | p0-shell |
+| id | phase | model (reason) | score | owns | after |
+|---|---|---|---|---|---|
+| p0-shell | 0 | claude-sonnet-builder (design shell) | A1 N1 C1 R0 S0 V1 D0 | `site/styles.css` | - |
+| p1-home | 1 | sol-medium (default) | A1 N1 C1 R0 S0 V1 D0 | `site/index.html` | p0-shell |
 
 - `id`: unique lowercase-kebab slug. It becomes the `--task` slug, the /tmp file names, and the worktree/branch name.
+- `score`: the seven scores, e.g. `A0 N1 C1 R0 S0 V1 D0`.
 - `owns`: exact paths (dirs and globs allowed), or `none` for read-only scouting.
 - `after`: ids this task needs finished first.
-- State each choice in one line before launching: `p1-home -> sol-medium (standard, clear spec)`.
+- State each choice in one line before launching: `p1-home -> sol-medium (score A1 N1 C1 R0 S0 V1 D0: default)`.
 
 ## Concurrency caps (defaults, edit this table; all numbers are guesses)
 
@@ -130,8 +146,10 @@ Read the diff of owned files only. Changed lines = added + removed from `git dif
 | luna or terra | `sonnet-reviewer` |
 | sol medium, diff <= 400 changed lines | `sonnet-reviewer` |
 | sol medium over 400 lines, or sol high | Opus reviews itself (reads the diff in this session) |
+| Tasks routed by S = 2 or the Opus trigger | Opus reviews itself |
 | Claude builders (design, security) | Opus reviews itself |
 
+- The 400-line rule and the scores come from Module 3.
 - Never spawn a separate Opus reviewer. In the Module 3 cost test, fresh Opus reviewers were 23% of the bill and changed nothing.
 - If fixes push a task over 400 lines, its review moves up to Opus.
 - Give `sonnet-reviewer` the header (`task:`, `owns:`) and the acceptance criteria. It returns PASS or FAIL with a numbered defect list. Non-blocking notes are listed apart; do not send them back unless they break a criterion.
@@ -146,6 +164,8 @@ A fix task keeps the original `owns:` and gets task id `<id>-r1`, `<id>-r2`, `<i
 | sol (medium or high) | same model | `claude-sonnet-builder` (Sonnet high) | `claude-opus-builder` (Opus medium) |
 | luna or terra | same model | sol high | `claude-sonnet-builder` |
 | Claude builders | same agent | `claude-opus-builder` | record and continue |
+
+A task routed to `claude-sonnet-builder` by S = 2 follows the "Claude builders" row.
 
 After round 3 still failing: record the defect in the final summary and continue. A drained Codex model in a fix round (exit 3) is not a blocker: take the next round's agent. Any Claude-plan fix or fallback is stated in the plan line and the final summary.
 
@@ -168,8 +188,10 @@ When a Codex model looks drained, `scripts/codex-run.sh` walks the chain (max 2 
 ## Final summary
 One summary: what was built; the table below; fixes by round (call out Claude-plan work); cap changes; worktree use; open items; minor choices made.
 
-| phase | task | model requested | model that ran | fallbacks | reviewer | rounds | result |
-|---|---|---|---|---|---|---|---|
+| phase | task | score | model requested | model that ran | fallbacks | reviewer | rounds | result |
+|---|---|---|---|---|---|---|---|---|
+
+After each task, append one line to `TASKS.md`: `ID | phase | route | score | reviewer | rounds | result | notes`. This is the data for tuning routing later.
 
 ## If everything fails
 Only when every Codex model is drained or `codex` is broken AND Claude builders cannot take the work: stop and tell the user. Do not do the bulk work yourself.
