@@ -9,7 +9,8 @@
 | Implementer (simple) | `haiku-implementer` | Haiku · high | Fully specified, tool-checkable tasks | Judgment calls, core logic |
 | Implementer (default) | `implementer` | Sonnet · high | Normal features, bugs, integrations | Plan beyond its task |
 | Implementer (hardest) | `opus-implementer` | Opus · medium | Hard diagnosis, security/money/PHI logic, new architecture | Simple tasks |
-| Reviewer | `reviewer` | Opus · medium | Reviews EVERY build task | Fix code |
+| Reviewer (default) | `reviewer` | Sonnet · medium | Reviews normal-size, non-sensitive tasks | Fix code |
+| Reviewer (large/sensitive) | `opus-reviewer` | Opus · medium | Reviews large, sensitive, Opus-routed tasks and fixer rounds | Fix code |
 | Fixer | `fixer` | Opus · medium | Takes over after two failed reviews | First attempts |
 
 ## Hard rules for the orchestrator
@@ -20,11 +21,15 @@
 
 ## Workflow
 
+### 0. Small-job rule (check first)
+If the whole request plans to 2 or fewer build tasks and none scores S = 2 or D = 2, skip the full pipeline: send it as ONE `implementer` (Sonnet) task, reviewed once by the Sonnet `reviewer`. No scout unless something is genuinely unknown. Every extra agent costs 45-80k tokens of setup.
+
 ### 1. Plan
 - Unknowns first: send `scout` to find what you need. Plan from its report, not from raw files.
-- Break the request into tasks. Group tiny related edits into one task: every task costs one Opus review.
-- Each task: **ID · goal · files in scope · acceptance criteria (checkable) · score · route**.
-- Show the plan and routes; wait for approval unless the user says proceed.
+- Break the request into tasks. Group tiny related edits on the same files into one task. Otherwise split by file ownership so tasks can run in parallel; don't split below roughly one file or one page per task.
+- Each task: **ID · wave · goal · files in scope · acceptance criteria (checkable) · score · route**.
+- Group tasks into waves. Wave 0 = shared foundations (shared styles, shared components, config), run alone first. Wave 1 = independent tasks, run in parallel. Later waves build on earlier ones. Each file is owned by one task per wave. Example: shared CSS + 4 pages → wave 0 builds CSS + layout; wave 1 builds the 4 pages, one task each.
+- Show the plan with waves and routes; wait for approval unless the user says proceed.
 
 ### 2. Score every build task (0 / 1 / 2 each, takes 10 seconds)
 | | 0 | 1 | 2 |
@@ -54,12 +59,13 @@ Acceptance criteria:
 - <checkable criterion>
 Out of scope: <what not to touch>
 ```
-Parallel only for tasks whose files in scope do not overlap. Never two tasks on the same file at once.
+Parallel by default: independent tasks in the same wave whose files in scope do not overlap MUST be launched together (multiple Agent calls in one message), max 4 at once. Never two tasks on the same file at once.
 
-### 5. Review — Opus reviews every build task, scoped to save quota
-Send `reviewer`: the task brief + criteria, the implementer's list of changed files, and the diff (`git diff` if the repo uses git). Not the implementer's self-assessment. The reviewer reads the changed files and their direct dependents only, with no open-ended exploration.
+### 5. Review — one reviewer per task, scoped to save quota
+Use `opus-reviewer` if ANY: the task was routed to `opus-implementer` or `fixer` · S ≥ 1 · D = 2 · the diff is large (more than 5 files OR more than ~400 changed lines, per `git diff --stat`). Otherwise use the Sonnet `reviewer`. Setup/context size doesn't indicate difficulty; the size and risk of the change does.
+Send the reviewer: the task brief + criteria, the implementer's list of changed files, and the diff (`git diff` if the repo uses git). Not the implementer's self-assessment. The reviewer reads the changed files and their direct dependents only, with no open-ended exploration.
 
-### 6. Decide (max 3 reviews per task)
+### 6. Decide (max 3 reviews per task; any review of fixer output is by `opus-reviewer`)
 | Route | Fail 1 | Fail 2 | Fail 3 |
 |---|---|---|---|
 | Haiku (or Haiku returns ESCALATE) | `implementer` (Sonnet) fixes; never back to Haiku | `fixer` (Opus) with full history | stop → ask the user |
@@ -69,14 +75,15 @@ Send `reviewer`: the task brief + criteria, the implementer's list of changed fi
 Escalation to the user includes the task, remaining issues, whether findings repeated or changed, and your recommended options.
 
 ### Review consistency
-On re-reviews, tell `reviewer` to check each previous finding first (resolved / unresolved), then look for new issues. If a review raises new issues not caused by the latest change, flag it: the brief may be the problem.
+On re-reviews, tell the reviewer to check each previous finding first (resolved / unresolved), then look for new issues. If a review raises new issues not caused by the latest change, flag it: the brief may be the problem.
 
 ### 7. Log and report
-- After each task, append one line to `TASKS.md`: `ID | route | score | reviews | result | notes`. This is the data for tuning the routing later.
+- After each task, append one line to `TASKS.md`: `ID | wave | route | score | reviewer | reviews | result | notes`. This is the data for tuning the routing later.
 - Tell the user in 1–3 lines: task ID, route, PASS/FAIL, what changed. At the end, a short summary with tasks per route and the first-pass rate.
 
 ## Quota discipline (Pro plan: 5-hour and weekly limits, shared with claude.ai)
-- Opus uses the most quota. Opus builds only what the rubric sends it.
+- Opus uses the most quota. Opus builds only what the rubric sends it, and reviews only large, sensitive or Opus-routed work. Sonnet reviews by default.
+- Apply the small-job rule before planning waves.
 - Keep every sub-agent report short; never paste code into the main chat.
-- Prefer one well-sized task over several tiny ones (fewer reviews).
+- Parallel saves time, not tokens. Parallelize only real independent work; don't split a job just to fan it out.
 - Suggest `/clear` to the user between unrelated pieces of work.

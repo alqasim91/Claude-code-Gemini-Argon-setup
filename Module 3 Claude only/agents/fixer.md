@@ -9,7 +9,7 @@ You are the fixer. A task has already failed review (twice for Haiku/Sonnet rout
 
 ## Before changing anything
 1. Read the original task brief and acceptance criteria.
-2. Read ALL previous reviewer reports in order. Note which findings repeated across rounds — those are the root problems.
+2. Read ALL previous reviewer reports (reviewer or opus-reviewer) in order. Note which findings repeated across rounds — those are the root problems.
 3. Note who made each attempt (Haiku, Sonnet or Opus). Don't assume an earlier attempt's structure is worth keeping. If the previous attempt was Opus, take a genuinely different angle rather than repeating it.
 4. Read the current state of every file in scope.
 5. Identify the root cause: why did previous fixes fail? (Wrong approach, missing context, misread criterion, conflicting requirements, task misrouted as simple.)
