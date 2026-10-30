@@ -40,7 +40,7 @@ Unzip `module-7-files.zip` so the `module-7` folder sits **inside your project f
 
 You are copying:
 - `CLAUDE.md` and `AGENTS.md` to the project root.
-- `agents/*.md` (4 files) to `.claude/agents/`.
+- `agents/*.md` (5 files) to `.claude/agents/`.
 - `scripts/codex-run.sh` to `scripts/`, made executable.
 - A new `.claude/codex-quota/` folder, hidden from git.
 
@@ -57,7 +57,7 @@ echo ".claude/codex-quota/" >> .gitignore
 ```bash
 ls -la .claude/agents scripts
 ```
-You should see `claude-sonnet-builder.md`, `claude-opus-builder.md`, `claude-haiku-builder.md`, `sonnet-reviewer.md` and an executable `codex-run.sh`. "No such file" means the terminal was not in the project folder.
+You should see `claude-sonnet-builder.md`, `claude-opus-builder.md`, `claude-haiku-builder.md`, `sonnet-reviewer.md`, `scout.md` and an executable `codex-run.sh`. "No such file" means the terminal was not in the project folder.
 
 **Windows (PowerShell)**
 ```powershell
@@ -81,7 +81,7 @@ git commit -m "start"
 ```
 claude
 ```
-Type `/agents`. You should see `claude-sonnet-builder`, `claude-opus-builder`, `claude-haiku-builder` and `sonnet-reviewer`. Not there? Quit, start again, re-check Step 4.
+Type `/agents`. You should see `claude-sonnet-builder`, `claude-opus-builder`, `claude-haiku-builder`, `sonnet-reviewer` and `scout`. Not there? Quit, start again, re-check Step 4.
 
 ## Step 7. Run the test prompt
 Open `module-7/test-prompt.md`, copy the prompt into Claude Code unchanged. Then use its "What to check" list.
@@ -108,7 +108,8 @@ The script never bypasses the Codex sandbox or approvals. Do not add flags that 
 | **luna** (`gpt-6-luna`) | Scout (low). Tests, formatting, boilerplate, mechanical edits (medium). |
 | **`claude-sonnet-builder`** | Design shells and first drafts. Security, auth, secrets. Fix rounds. In Module 3 mode: design, S = 2, docs and the rest. |
 | **`claude-opus-builder`** | The most important designs. Round-3 fixes for Sol tasks. |
-| **`claude-haiku-builder`** | Module 3 mode only (Codex pool drained, you said yes): easy tasks and read-only scouting. |
+| **`claude-haiku-builder`** | Module 3 mode only (Codex pool drained, you said yes): easy tasks. |
+| **`scout`** | Module 3 mode only (Codex pool drained, you said yes): all read-only work (search, explain, research), with file and line evidence. Never edits. |
 | **`sonnet-reviewer`** | Reads one task's diff, returns PASS or FAIL. Read-only. |
 
 Model IDs are from learn.chatgpt.com/docs/models, checked 2026-10-29. Astra (`gpt-6-astra`) is deliberately not used.
@@ -186,7 +187,7 @@ All Codex models (luna, terra, sol) share ONE quota pool on your ChatGPT plan. W
 - One marker file, `.claude/codex-quota/codex`, records the drain. It counts as fresh for 24 hours: the pool resets weekly, and Opus retries Codex 24 hours after the marker. Delete it to clear it.
 - There is no Codex-to-Codex fallback. A run that hits a quota error, or starts with a fresh marker, prints `drained: codex pool (shared by all models)` and exits 3.
 - **Opus always asks you first.** On a drained pool (at planning, before any phase, or when a task exits 3) Opus stops launching Codex tasks, lets running ones finish, and asks: "Codex pool drained at <time>. Switch the remaining tasks to Module 3 mode (Claude plan only)? Or wait / delete the marker to retry." This is the one question Opus asks in a build. It does nothing on Claude until you say yes.
-- **Module 3 mode** (after a yes) is Claude only, routed by the same scores as Module 3: Opus-trigger tasks (D = 2, two or more 2s, S = 2 and N 1 or more, A = 2 and C = 2) go to `claude-opus-builder`. Easy tasks and read-only scouting go to `claude-haiku-builder`. Everything else (design, S = 2, docs) goes to `claude-sonnet-builder`.
+- **Module 3 mode** (after a yes) is Claude only, routed by the same scores as Module 3: Opus-trigger tasks (D = 2, two or more 2s, S = 2 and N 1 or more, A = 2 and C = 2) go to `claude-opus-builder`. Read-only work (find, explain, research, summarize) goes to `scout`. Easy tasks go to `claude-haiku-builder`. Everything else (design, S = 2, docs) goes to `claude-sonnet-builder`.
 - Module 3 mode reviews: `sonnet-reviewer` up to 400 changed lines, Opus above that and for opus-builder work. Fixes: same agent, then the next tier up (haiku, sonnet, opus), then `claude-opus-builder`. Up to 3 tasks at once. Plan lines show `(Module 3 mode)`, and the summary lists those tasks.
 - A hard (sol-high) task is never downgraded to luna or terra.
 

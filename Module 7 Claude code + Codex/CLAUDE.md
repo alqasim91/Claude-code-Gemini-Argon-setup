@@ -28,7 +28,8 @@ Claude-plan agents (in `.claude/agents/`):
 |---|---|---|
 | `claude-sonnet-builder` | sonnet, effort high | Design shells and first design drafts. Security, auth, secrets, unclear-spec tasks (Opus writes the spec). Fix rounds. Module 3 mode only: design, S = 2, docs and everything not easy or Opus-trigger |
 | `claude-opus-builder` | opus, effort medium | The most important designs. Round-3 fixes for Sol tasks. Builds and fixes |
-| `claude-haiku-builder` | haiku | Module 3 mode only (pool drained, user said yes): easy tool-verifiable tasks and read-only scouting |
+| `claude-haiku-builder` | haiku | Module 3 mode only (pool drained, user said yes): easy tool-verifiable build tasks |
+| `scout` | haiku | Module 3 mode only: all read-only work (search, explain, research), with file:line or URL evidence. Never edits. |
 | `sonnet-reviewer` | sonnet | Reviews ONE task's diff, read-only. Returns PASS or FAIL |
 
 ## Score every build task (0 / 1 / 2 each, takes 10 seconds)
@@ -139,7 +140,7 @@ Exit codes:
 | 3 | `drained: codex pool (shared by all models)` (quota error, or the marker is fresh) | Pool drained: stop launching Codex tasks, let running ones finish, ask the user. Claude only after a yes (Module 3 mode). See Shared Codex pool |
 | 4 | Suspected concurrency limit | Lower the total cap by 1, relaunch |
 
-Claude tasks: Agent tool with `subagent_type: claude-sonnet-builder`, `claude-opus-builder`, `claude-haiku-builder` (Module 3 mode only), or `sonnet-reviewer`, `run_in_background: true`.
+Claude tasks: Agent tool with `subagent_type: claude-sonnet-builder`, `claude-opus-builder`, `claude-haiku-builder` or `scout` (Module 3 mode only), or `sonnet-reviewer`, `run_in_background: true`.
 
 ## Review ladder
 Read the diff of owned files only. Changed lines = added + removed from `git diff --numstat` on owned files, plus the line count of new untracked owned files (the script prints it).
@@ -186,8 +187,9 @@ All Codex models (luna, terra, sol) share ONE quota pool on the ChatGPT plan. Th
 4. A fresh marker before planning means no plan is printed and nothing is launched until the user answers.
 
 **Module 3 mode (after a yes).** Re-route the remaining tasks with the same scores. First match wins:
+- Read-only (find, explain, research, summarize) -> `scout`. No review.
 - Opus trigger (D = 2, or two or more dimensions = 2, or S = 2 and N >= 1, or A = 2 and C = 2) -> `claude-opus-builder`.
-- Easy (A, R, S, V, D all 0, total <= 2, complete spec, a tool can verify it) and read-only scouting -> `claude-haiku-builder` (read-only tasks use `owns: none`: no edits).
+- Easy (A, R, S, V, D all 0, total <= 2, complete spec, a tool can verify it) -> `claude-haiku-builder`.
 - Everything else (design, S = 2, docs, copy, logic) -> `claude-sonnet-builder`.
 - Tasks already accepted from Codex stay as they are. A task that exited 3 may have been partly edited: add to its brief "A Codex run may have partly edited the owned files before it stopped. Inspect them first, then finish the task."
 - Reviews: `sonnet-reviewer` for haiku and sonnet work up to 400 changed lines. Opus reads the diff itself above 400 lines and for `claude-opus-builder` work.

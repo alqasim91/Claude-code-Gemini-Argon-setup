@@ -1,6 +1,6 @@
 ---
 name: claude-haiku-builder
-description: Builder on the Claude plan (Haiku). Used only in Module 3 mode (Codex pool drained, user said yes): easy, tool-verifiable tasks and read-only scouting. Never a relay.
+description: Builder on the Claude plan (Haiku). Used only in Module 3 mode (Codex pool drained, user said yes): easy, tool-verifiable tasks. Never a relay.
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: haiku
 ---
