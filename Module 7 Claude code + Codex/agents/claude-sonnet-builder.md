@@ -1,6 +1,6 @@
 ---
 name: claude-sonnet-builder
-description: Builder on the Claude plan (Sonnet, effort high). Builds design shells and first design drafts, security/auth/secrets/unclear-spec tasks from an Opus-written spec, fix rounds, and, in Module 3 mode (Codex pool drained, user said yes), most tasks. Never a relay.
+description: Builder on the Claude plan (Sonnet, effort high). Builds design shells and first design drafts, security/auth/secrets/unclear-spec tasks from an Opus-written spec, fix rounds, and, in Module 3 mode (Codex limit hit, user said Module 3), most tasks. Never a relay.
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 effort: high

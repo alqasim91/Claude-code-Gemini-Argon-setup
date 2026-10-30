@@ -1,6 +1,6 @@
 ---
 name: scout
-description: Module 3 mode only (Codex pool drained, user said yes): ALL read-only work - finding files, searching the codebase, explaining how something works, reading docs, web research, summarizing logs. The orchestrator must send exploration here instead of doing it in the main chat. Never edits anything.
+description: Module 3 mode only (Codex limit hit, user said Module 3): ALL read-only work - finding files, searching the codebase, explaining how something works, reading docs, web research, summarizing logs. The orchestrator must send exploration here instead of doing it in the main chat. Never edits anything.
 model: haiku
 tools: Read, Grep, Glob, WebSearch, WebFetch
 ---

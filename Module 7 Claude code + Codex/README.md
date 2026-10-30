@@ -108,8 +108,8 @@ The script never bypasses the Codex sandbox or approvals. Do not add flags that 
 | **luna** (`gpt-6-luna`) | Scout (low). Tests, formatting, boilerplate, mechanical edits (medium). |
 | **`claude-sonnet-builder`** | Design shells and first drafts. Security, auth, secrets. Fix rounds. In Module 3 mode: design, S = 2, docs and the rest. |
 | **`claude-opus-builder`** | The most important designs. Round-3 fixes for Sol tasks. |
-| **`claude-haiku-builder`** | Module 3 mode only (Codex pool drained, you said yes): easy tasks. |
-| **`scout`** | Module 3 mode only (Codex pool drained, you said yes): all read-only work (search, explain, research), with file and line evidence. Never edits. |
+| **`claude-haiku-builder`** | Module 3 mode only (Codex limit hit, you said Module 3): easy tasks. |
+| **`scout`** | Module 3 mode only (Codex limit hit, you said Module 3): all read-only work (search, explain, research), with file and line evidence. Never edits. |
 | **`sonnet-reviewer`** | Reads one task's diff, returns PASS or FAIL. Read-only. |
 
 Model IDs are from learn.chatgpt.com/docs/models, checked 2026-10-29. Astra (`gpt-6-astra`) is deliberately not used.
@@ -156,7 +156,7 @@ Opus logs one line per task in `TASKS.md` (`ID | phase | route | score | reviewe
       |
  4 REVIEW      each phase is reviewed and fixed before the next starts
       |
- 5 SUMMARY     one table: phase, task, score, model, pool drained -> Claude, reviewer, rounds, result
+ 5 SUMMARY     one table: phase, task, score, model, limit hit (5h/weekly) -> what happened, reviewer, rounds, result
 ```
 - **Phases.** If your prompt is not phased, Opus phases it. Phase 0 is the foundation. Each later phase builds on the previous one. A multi-step phase is split into parallel tasks on separate files. A single-step phase is one job.
 - **One owner per file.** Two tasks never touch the same file in a phase.
@@ -183,17 +183,25 @@ The 400-line rule and the scores come from Module 3. Opus never spawns a separat
 Still failing after round 3? It goes in the final summary and the build keeps going.
 
 ## When quota runs out
-All Codex models (luna, terra, sol) share ONE quota pool on your ChatGPT plan. When any model hits a quota error, the pool is drained for all of them.
-- One marker file, `.claude/codex-quota/codex`, records the drain. It counts as fresh for 24 hours: the pool resets weekly, and Opus retries Codex 24 hours after the marker. Delete it to clear it.
-- There is no Codex-to-Codex fallback. A run that hits a quota error, or starts with a fresh marker, prints `drained: codex pool (shared by all models)` and exits 3.
-- **Opus always asks you first.** On a drained pool (at planning, before any phase, or when a task exits 3) Opus stops launching Codex tasks, lets running ones finish, and asks: "Codex pool drained at <time>. Switch the remaining tasks to Module 3 mode (Claude plan only)? Or wait / delete the marker to retry." This is the one question Opus asks in a build. It does nothing on Claude until you say yes.
-- **Module 3 mode** (after a yes) is Claude only, routed by the same scores as Module 3: Opus-trigger tasks (D = 2, two or more 2s, S = 2 and N 1 or more, A = 2 and C = 2) go to `claude-opus-builder`. Read-only work (find, explain, research, summarize) goes to `scout`. Easy tasks go to `claude-haiku-builder`. Everything else (design, S = 2, docs) goes to `claude-sonnet-builder`.
+The Codex plan has TWO limits: a 5-hour limit and a weekly limit. Both are shared by all Codex models (luna, terra, sol), one pool. There is no Codex-to-Codex fallback. The script keeps one marker per limit (`.claude/codex-quota/5h` and `.claude/codex-quota/weekly`, each with `until=` and `reason=` lines) and exits with a different code for each.
+
+| Limit | Script exit | What Opus does |
+|---|---|---|
+| 5-hour | 3: `drained: codex 5h limit until <time>` | Stops launching Codex tasks, lets running ones finish, then STOPS and tells you: "Codex 5-hour limit hit. Codex is back at <time>. Re-run me after that and I continue from the next task." No Claude builders and no question, unless you say "use Module 3" (now or in your first prompt). |
+| Weekly | 5: `drained: codex weekly limit until <time>` | Stops launching Codex tasks, lets running ones finish, then asks: "Codex weekly limit hit (until <time>). Wait (I re-check Codex in 24 hours) or switch the remaining tasks to Module 3 mode now?" Nothing runs on Claude until you say Module 3. If you wait, the next run after the until time re-checks and asks again if it is still weekly. |
+
+- Check the state any time with `scripts/codex-run.sh --status`: it prints each active marker with its until time and the time remaining, and exits 0 (none active), 3 (5-hour active) or 5 (weekly active). Opus runs it before planning and before each phase.
+- The weekly question is the one question Opus asks in a build. The 5-hour case is a stop-and-tell.
+- Delete a marker file to clear it by hand. An old single `.claude/codex-quota/codex` file from an earlier version is ignored: delete it.
+- A run that hits a limit still prints its report, including any partial edits.
+- In interactive Codex, the `/status` command shows both "5h limit" and "Weekly limit" with reset times. The usage page is chatgpt.com/codex/settings/usage.
+- **Module 3 mode** (only when you say Module 3) is Claude only, routed by the same scores as Module 3: Opus-trigger tasks (D = 2, two or more 2s, S = 2 and N 1 or more, A = 2 and C = 2) go to `claude-opus-builder`. Read-only work (find, explain, research, summarize) goes to `scout`. Easy tasks go to `claude-haiku-builder`. Everything else (design, S = 2, docs) goes to `claude-sonnet-builder`.
 - Module 3 mode reviews: `sonnet-reviewer` up to 400 changed lines, Opus above that and for opus-builder work. Fixes: same agent, then the next tier up (haiku, sonnet, opus), then `claude-opus-builder`. Up to 3 tasks at once. Plan lines show `(Module 3 mode)`, and the summary lists those tasks.
 - A hard (sol-high) task is never downgraded to luna or terra.
 
 # Part 3: Good to know
 
-- **Parallel runs drain the shared pool faster.** Prefer fewer, bigger tasks.
+- **Parallel runs use up the shared limits faster.** Prefer fewer, bigger tasks.
 - **Default caps:** 3 tasks at once (sol 2, terra 2, luna 3). They limit parallel sessions, not quota. Claude builder runs count toward the total only. Edit the table in `CLAUDE.md`.
 - **Claude-plan work** (design, security, fix rounds 2 and 3, Module 3 mode) uses your Claude plan, not ChatGPT quota.
 - **Edit the tables.** Routing, caps, ladders and the model pool live in `CLAUDE.md`. Model IDs and flags also live at the top of `scripts/codex-run.sh`. Keep both in step.
@@ -201,7 +209,7 @@ All Codex models (luna, terra, sol) share ONE quota pool on your ChatGPT plan. W
 - **Known unknowns:**
   - The `codex exec` flags come from third-party docs. Verify with `codex exec --help` on first run.
   - Codex concurrency limits are unpublished. The caps are guesses. They limit parallel sessions, not quota.
-  - Confirmed: all Codex models share ONE quota pool on the ChatGPT plan. Per-model draw rates are still unpublished.
-  - The real quota and concurrency error wording is unconfirmed. The script matches on guessed keywords.
+  - Confirmed: all Codex models share ONE pool with two limits (5-hour and weekly). Per-model draw rates are still unpublished.
+  - The exact quota error wording is unverified. Known samples: "try again at 20 Aug 2026, 16:29.", "try again in 2 hours 3 minutes.", "You've reached your 5-hour work usage limit". The script parses these best effort, prints the raw matching line in its report, and stores it as `reason=` in the marker. If no reset time parses, 5h uses now + 5 hours and weekly uses now + 24 hours. The concurrency wording is unconfirmed too.
   - Whether `effort: medium` and `effort: high` in the agent files are honored is unverified.
   - Windows needs Git Bash or WSL for the script.
