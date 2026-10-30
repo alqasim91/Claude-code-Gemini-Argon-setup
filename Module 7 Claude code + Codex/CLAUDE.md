@@ -2,14 +2,15 @@
 
 # Orchestration (Module 7: Claude plans in phases, Codex models run tasks in parallel)
 
-Claude (Opus, this session) plans, routes, and reviews. It never implements bulk work. Implementation goes to Codex models through `scripts/codex-run.sh`, which Opus runs itself with Bash in the background. There is no relay subagent per task. Design, security, and fix rounds 2 and 3 go to Claude-plan subagents (`claude-sonnet-builder`, `claude-opus-builder`). Cheap reviews go to `sonnet-reviewer`. Independent tasks run in parallel, in phases, on disjoint files.
+Claude (Opus, this session) plans, routes, and reviews. It never implements bulk work. Implementation goes to Codex models through `scripts/codex-run.sh`, which Opus runs itself with Bash in the background. There is no relay subagent per task. Design, security, and fix rounds 2 and 3 go to Claude-plan subagents (`claude-sonnet-builder`, `claude-opus-builder`). If the Codex pool is drained, and only with the user's consent, the remaining work runs in Module 3 mode (Claude only, see Shared Codex pool). Cheap reviews go to `sonnet-reviewer`. Independent tasks run in parallel, in phases, on disjoint files.
 
 ## Autonomy (no decision boxes)
 Run end to end without asking the user. Never use AskUserQuestion or offer choice boxes. The task plan is announced, not submitted for approval.
 - Found a defect? Send it back in the same turn, as a new task listing each defect. Do not ask first.
 - Fix loop: max 3 rounds per task, per the Fix ladder. After round 3 still failing: record the defect in the final summary and continue.
 - Unclear spec or minor choice: pick the most reasonable option, note it in the summary, keep going. Cosmetic or out-of-spec gaps are listed in the summary, not sent back, unless they break an acceptance criterion.
-- Stop and ask only for hard blockers: `codex` missing (exit 2), a login failure, a permission block, an action that deletes data or touches secrets, or Codex chain drained AND Claude builders unavailable. A suspected concurrency error (exit 4) is not a hard blocker.
+- Stop and ask only for hard blockers: `codex` missing (exit 2), a login failure, a permission block, an action that deletes data or touches secrets, the Codex pool drained and the user has not said yes to Module 3 mode (see Shared Codex pool), or the pool drained AND Claude builders unavailable. A suspected concurrency error (exit 4) is not a hard blocker.
+- ONE exception to "no questions": when the Codex pool is drained, ask the user for consent before doing anything on Claude (see Shared Codex pool). Never switch to Claude without a yes.
 - Finish with one summary (see Final summary).
 
 ## Model pool (edit this table to change behavior)
@@ -25,8 +26,9 @@ Claude-plan agents (in `.claude/agents/`):
 
 | Agent | Model | Use for |
 |---|---|---|
-| `claude-sonnet-builder` | sonnet, effort high | Design shells and first design drafts. Security, auth, secrets, unclear-spec tasks (Opus writes the spec). Fix rounds. Fallback when Codex is drained |
+| `claude-sonnet-builder` | sonnet, effort high | Design shells and first design drafts. Security, auth, secrets, unclear-spec tasks (Opus writes the spec). Fix rounds. Module 3 mode only: design, S = 2, docs and everything not easy or Opus-trigger |
 | `claude-opus-builder` | opus, effort medium | The most important designs. Round-3 fixes for Sol tasks. Builds and fixes |
+| `claude-haiku-builder` | haiku | Module 3 mode only (pool drained, user said yes): easy tool-verifiable tasks and read-only scouting |
 | `sonnet-reviewer` | sonnet | Reviews ONE task's diff, read-only. Returns PASS or FAIL |
 
 ## Score every build task (0 / 1 / 2 each, takes 10 seconds)
@@ -65,7 +67,7 @@ If the user's prompt is not already phased, turn it into phases yourself.
 3. **Review a phase completely (diffs, fix rounds, accepted) before starting the next.**
 4. Review may reveal new tasks: add them to the next phase and note it in the summary.
 
-Before the first launch, print the plan (no approval needed). Also list fresh quota markers first (see Quota fallback).
+Before the first launch, print the plan (no approval needed). Check the pool marker first (see Shared Codex pool). If it is fresh, do not print a plan or launch anything: ask the user the consent question. In Module 3 mode, plan lines end with `(Module 3 mode)`.
 
 | id | phase | model (reason) | score | owns | after |
 |---|---|---|---|---|---|
@@ -79,6 +81,7 @@ Before the first launch, print the plan (no approval needed). Also list fresh qu
 - State each choice in one line before launching: `p1-home -> sol-medium (score A1 N1 C1 R0 S0 V1 D0: default)`.
 
 ## Concurrency caps (defaults, edit this table; all numbers are guesses)
+These caps limit parallel sessions and request rate. They are not quota: quota is one shared pool (see Shared Codex pool).
 
 | Limit | Max running at once |
 |---|---|
@@ -90,7 +93,7 @@ Before the first launch, print the plan (no approval needed). Also list fresh qu
 - A task counts against its Codex model family (any effort) from launch until its report returns. Fix rounds and scouting count too.
 - Claude builder and fixer runs count toward the total only.
 - Phase larger than the caps: launch what fits, hold the rest, launch each as a slot frees. Alternate models in the queue.
-- A fallback replaces the task's own run, so it keeps its slot: it may exceed its new model's cap, never the total.
+- Module 3 mode: total 3, no per-model caps. A task re-routed after a drained run keeps its slot.
 - On a suspected concurrency error (exit 4): lower the total by 1 (min 1) for the session, relaunch the affected tasks, note it in the summary.
 
 ## File ownership
@@ -122,9 +125,9 @@ design                  (optional, bare line, builders only)
 ## Launching
 Codex task, one Bash call per task, all calls of a phase in ONE message, each with `run_in_background: true`:
 ```
-scripts/codex-run.sh --model <alias[-effort]|full-id> --task <slug> --owns "<comma list|none>" --brief /tmp/brief-<slug>.md [--worktree <path>] [--no-fallback]
+scripts/codex-run.sh --model <alias[-effort]|full-id> --task <slug> --owns "<comma list|none>" --brief /tmp/brief-<slug>.md [--worktree <path>] [--effort <level>]
 ```
-Aliases: luna, terra, sol, with optional `-low|-medium|-high|-xhigh` (default medium). A full model id works too (`--effort` sets effort). Wait for the completion notifications. Never poll with sleep. Never start the next phase early. Never add a flag that bypasses the sandbox or approvals.
+Aliases: luna, terra, sol, with optional `-low|-medium|-high|-xhigh` (default medium). A full model id works too (`--effort` sets effort). There is no `--no-fallback` flag: the script never tries a second Codex model. Wait for the completion notifications. Never poll with sleep. Never start the next phase early. Never add a flag that bypasses the sandbox or approvals.
 
 Exit codes:
 
@@ -133,10 +136,10 @@ Exit codes:
 | 0 | Success, report printed | Review |
 | 1 | Other error (last 20 log lines shown) | Read it. Fix the cause or treat as hard blocker |
 | 2 | `codex` not installed or bad arguments | Hard blocker, tell the user |
-| 3 | `drained: <chain>` (quota) | Claude builder for the task, or next fix-ladder step |
+| 3 | `drained: codex pool (shared by all models)` (quota error, or the marker is fresh) | Pool drained: stop launching Codex tasks, let running ones finish, ask the user. Claude only after a yes (Module 3 mode). See Shared Codex pool |
 | 4 | Suspected concurrency limit | Lower the total cap by 1, relaunch |
 
-Claude tasks: Agent tool with `subagent_type: claude-sonnet-builder`, `claude-opus-builder`, or `sonnet-reviewer`, `run_in_background: true`.
+Claude tasks: Agent tool with `subagent_type: claude-sonnet-builder`, `claude-opus-builder`, `claude-haiku-builder` (Module 3 mode only), or `sonnet-reviewer`, `run_in_background: true`.
 
 ## Review ladder
 Read the diff of owned files only. Changed lines = added + removed from `git diff --numstat` on owned files, plus the line count of new untracked owned files (the script prints it).
@@ -157,7 +160,7 @@ Read the diff of owned files only. Changed lines = added + removed from `git dif
 - Never accept "done" on a report alone. Luna scouting reports are leads, not facts: verify anything you act on.
 
 ## Fix ladder (max 3 rounds per task)
-A fix task keeps the original `owns:` and gets task id `<id>-r1`, `<id>-r2`, `<id>-r3`. Fix rounds of different tasks launch together, within caps. Fix rounds of Codex models use `--no-fallback`. Round 1 uses the model that actually ran (after any fallback).
+A fix task keeps the original `owns:` and gets task id `<id>-r1`, `<id>-r2`, `<id>-r3`. Fix rounds of different tasks launch together, within caps. Round 1 uses the same model as the original run. If a Codex fix round exits 3, the pool is drained: follow Shared Codex pool (ask first).
 
 | Implementer | Round 1 | Round 2 | Round 3 |
 |---|---|---|---|
@@ -167,31 +170,39 @@ A fix task keeps the original `owns:` and gets task id `<id>-r1`, `<id>-r2`, `<i
 
 A task routed to `claude-sonnet-builder` by S = 2 follows the "Claude builders" row.
 
-After round 3 still failing: record the defect in the final summary and continue. A drained Codex model in a fix round (exit 3) is not a blocker: take the next round's agent. Any Claude-plan fix or fallback is stated in the plan line and the final summary.
+After round 3 still failing: record the defect in the final summary and continue. A Codex fix round that exits 3 is not retried on another Codex model: it waits for the consent answer, and after a yes it runs on the Module 3 mode ladder (see Shared Codex pool) at that round number. Any Claude-plan fix is stated in the plan line and the final summary.
 
-## Quota fallback and markers
-When a Codex model looks drained, `scripts/codex-run.sh` walks the chain (max 2 fallbacks) and reports what ran.
+## Shared Codex pool, marker and Module 3 mode
+All Codex models (luna, terra, sol) share ONE quota pool on the ChatGPT plan. There is no Codex-to-Codex fallback: if one model is drained, all are. The only fallback is Module 3 mode (Claude only), and only with the user's consent.
 
-| First choice | Then | Then | Then |
-|---|---|---|---|
-| luna | terra | sol | Claude |
-| terra | sol | Claude | - |
-| sol | Claude | - | - |
+- One marker: `.claude/codex-quota/codex` (UTC ISO time). The script writes it atomically (temp file in the same dir, then `mv`) when ANY Codex model hits a quota error. Fresh = under 24 hours old. The pool resets weekly; Opus retries Codex 24 hours after the marker.
+- Before planning and before every phase, check it: `find .claude/codex-quota -type f -name codex -mmin -1440`. A hit means the pool is drained. Delete the file to clear it.
+- When the marker is fresh at start, or a run hits a quota error, the script keeps or writes the marker, tries no other Codex model, prints `drained: codex pool (shared by all models)` and exits 3.
 
-"Claude" = the script exits 3 and prints `drained: <chain>`. Opus then spawns `claude-sonnet-builder` for that task and says so in the plan line and the summary. Never downgrade a hard (sol-high) task to luna or terra. Fix rounds never fall back (`--no-fallback`).
+**When the pool is drained (fresh marker before planning or before any phase, or any task exits 3):**
+1. Stop launching Codex tasks. Let tasks already running finish and review their results.
+2. Ask the user, in words (no decision box): "Codex pool drained at <marker time>. Switch the remaining tasks to Module 3 mode (Claude plan only)? Or wait / delete the marker to retry."
+3. Do nothing on Claude until the user says yes. Never fall back to Claude without consent, including hard (sol-high) tasks and fix rounds. "Wait" or "delete the marker" means: hold, then re-check the marker when the user says so.
+4. A fresh marker before planning means no plan is printed and nothing is launched until the user answers.
 
-- The script writes `.claude/codex-quota/<model-id>` (UTC ISO time), atomically (temp file in the same dir, then `mv`).
-- Before planning, list fresh markers: `find .claude/codex-quota -type f ! -name '.tmp.*' -mmin -360`. Skip models with a marker under 6 hours old **(guess)** and route to the chain's next step, saying so in the plan.
-- Clear a model by deleting its marker.
-- ChatGPT plan limits may be shared across all Codex models (unverified). Then every Codex model drains together and the work goes to Claude.
+**Module 3 mode (after a yes).** Re-route the remaining tasks with the same scores. First match wins:
+- Opus trigger (D = 2, or two or more dimensions = 2, or S = 2 and N >= 1, or A = 2 and C = 2) -> `claude-opus-builder`.
+- Easy (A, R, S, V, D all 0, total <= 2, complete spec, a tool can verify it) and read-only scouting -> `claude-haiku-builder` (read-only tasks use `owns: none`: no edits).
+- Everything else (design, S = 2, docs, copy, logic) -> `claude-sonnet-builder`.
+- Tasks already accepted from Codex stay as they are. A task that exited 3 may have been partly edited: add to its brief "A Codex run may have partly edited the owned files before it stopped. Inspect them first, then finish the task."
+- Reviews: `sonnet-reviewer` for haiku and sonnet work up to 400 changed lines. Opus reads the diff itself above 400 lines and for `claude-opus-builder` work.
+- Fix ladder: round 1 same agent, round 2 next tier up (haiku -> sonnet -> opus), round 3 `claude-opus-builder`, then record and continue. An opus-builder task stays on opus-builder.
+- Concurrency: total 3.
+- Plan lines end with `(Module 3 mode)`. The final summary lists which tasks ran in Module 3 mode.
+- Stay in Module 3 mode for the rest of the session unless the user says to retry Codex.
 
 ## Final summary
-One summary: what was built; the table below; fixes by round (call out Claude-plan work); cap changes; worktree use; open items; minor choices made.
+One summary: what was built; the table below (pool drained -> Claude is yes or no per task: yes means it ran in Module 3 mode after the user's consent); fixes by round (call out Claude-plan work); cap changes; worktree use; open items; minor choices made.
 
-| phase | task | score | model requested | model that ran | fallbacks | reviewer | rounds | result |
+| phase | task | score | model requested | model that ran | pool drained -> Claude | reviewer | rounds | result |
 |---|---|---|---|---|---|---|---|---|
 
 After each task, append one line to `TASKS.md`: `ID | phase | route | score | reviewer | rounds | result | notes`. This is the data for tuning routing later.
 
 ## If everything fails
-Only when every Codex model is drained or `codex` is broken AND Claude builders cannot take the work: stop and tell the user. Do not do the bulk work yourself.
+Only when `codex` is broken, or the pool is drained AND the user declines Module 3 mode or Claude builders cannot take the work: stop and tell the user. Do not do the bulk work yourself.

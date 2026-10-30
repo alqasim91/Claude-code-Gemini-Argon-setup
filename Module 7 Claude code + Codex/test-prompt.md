@@ -32,10 +32,10 @@ Print: files created, whether the self-check passed, issues found and fixed, and
 
 - A plan table was printed before any work started: id, phase, model with a reason, owned files, after.
 - The plan table shows a score per task (like `A0 N1 C1 R0 S0 V1 D0`), and each route matches the first-match list in `CLAUDE.md`. `TASKS.md` has one line per task.
-- The work was split into phases. Phase 0 holds the shared design (`styles.css`), and it went to `claude-sonnet-builder` or `claude-opus-builder`. No design work went to a Codex model.
+- The work was split into phases. Phase 0 holds the shared design (`styles.css`), and it went to `claude-sonnet-builder` or `claude-opus-builder` (also in Module 3 mode). No design work went to a Codex model.
 - Later tasks in one phase were launched together with `scripts/codex-run.sh`, and no two own the same file.
 - Models matched the work: `products.js` and page logic to sol, care guides and copy to terra, scouting checks to luna.
 - Reviews followed the ladder: `sonnet-reviewer` for luna, terra and small sol diffs; Opus read bigger diffs itself. No separate Opus reviewer was spawned.
 - Fixes (if any) went in order. Sol tasks: same model, then Claude Sonnet high, then Claude Opus medium. Luna or Terra tasks: same model, then Sol high, then Claude Sonnet high. Check the final table for rounds.
-- Quota: look in `.claude/codex-quota/`. A marker means a model drained. The final table should show the fallback and any work done on the Claude plan.
-- The final per-phase table, the printed "Elapsed: Xm Ys" line, and the files on disk (open `index.html`, use the filter, add to cart, reload, submit the form empty).
+- Quota: all Codex models share one pool, so look for the single marker `.claude/codex-quota/codex` (fresh for 24 hours; the pool resets weekly). If it exists, Opus stopped launching Codex tasks and asked you "Switch the remaining tasks to Module 3 mode (Claude plan only)?" before doing anything on Claude, and there was no Codex-to-Codex fallback. After your yes, plan lines show `(Module 3 mode)`: Opus-trigger tasks on `claude-opus-builder`, easy and read-only tasks on `claude-haiku-builder`, the rest on `claude-sonnet-builder`. The final table's "pool drained -> Claude" column is yes for those tasks.
+- The final per-phase table (with its "pool drained -> Claude" column), the printed "Elapsed: Xm Ys" line, and the files on disk (open `index.html`, use the filter, add to cart, reload, submit the form empty).

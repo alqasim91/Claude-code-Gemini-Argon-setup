@@ -40,7 +40,7 @@ Unzip `module-7-files.zip` so the `module-7` folder sits **inside your project f
 
 You are copying:
 - `CLAUDE.md` and `AGENTS.md` to the project root.
-- `agents/*.md` (3 files) to `.claude/agents/`.
+- `agents/*.md` (4 files) to `.claude/agents/`.
 - `scripts/codex-run.sh` to `scripts/`, made executable.
 - A new `.claude/codex-quota/` folder, hidden from git.
 
@@ -57,7 +57,7 @@ echo ".claude/codex-quota/" >> .gitignore
 ```bash
 ls -la .claude/agents scripts
 ```
-You should see `claude-sonnet-builder.md`, `claude-opus-builder.md`, `sonnet-reviewer.md` and an executable `codex-run.sh`. "No such file" means the terminal was not in the project folder.
+You should see `claude-sonnet-builder.md`, `claude-opus-builder.md`, `claude-haiku-builder.md`, `sonnet-reviewer.md` and an executable `codex-run.sh`. "No such file" means the terminal was not in the project folder.
 
 **Windows (PowerShell)**
 ```powershell
@@ -81,7 +81,7 @@ git commit -m "start"
 ```
 claude
 ```
-Type `/agents`. You should see `claude-sonnet-builder`, `claude-opus-builder` and `sonnet-reviewer`. Not there? Quit, start again, re-check Step 4.
+Type `/agents`. You should see `claude-sonnet-builder`, `claude-opus-builder`, `claude-haiku-builder` and `sonnet-reviewer`. Not there? Quit, start again, re-check Step 4.
 
 ## Step 7. Run the test prompt
 Open `module-7/test-prompt.md`, copy the prompt into Claude Code unchanged. Then use its "What to check" list.
@@ -106,8 +106,9 @@ The script never bypasses the Codex sandbox or approvals. Do not add flags that 
 | **sol** (`gpt-6.1-sol`) | Default builder (medium). Hard multi-file or tricky logic (high). |
 | **terra** (`gpt-6.1-terra`) | Docs, copy, content pages. |
 | **luna** (`gpt-6-luna`) | Scout (low). Tests, formatting, boilerplate, mechanical edits (medium). |
-| **`claude-sonnet-builder`** | Design shells and first drafts. Security, auth, secrets. Fix rounds. Fallback. |
+| **`claude-sonnet-builder`** | Design shells and first drafts. Security, auth, secrets. Fix rounds. In Module 3 mode: design, S = 2, docs and the rest. |
 | **`claude-opus-builder`** | The most important designs. Round-3 fixes for Sol tasks. |
+| **`claude-haiku-builder`** | Module 3 mode only (Codex pool drained, you said yes): easy tasks and read-only scouting. |
 | **`sonnet-reviewer`** | Reads one task's diff, returns PASS or FAIL. Read-only. |
 
 Model IDs are from learn.chatgpt.com/docs/models, checked 2026-10-29. Astra (`gpt-6-astra`) is deliberately not used.
@@ -154,7 +155,7 @@ Opus logs one line per task in `TASKS.md` (`ID | phase | route | score | reviewe
       |
  4 REVIEW      each phase is reviewed and fixed before the next starts
       |
- 5 SUMMARY     one table: phase, task, score, model, fallbacks, reviewer, rounds, result
+ 5 SUMMARY     one table: phase, task, score, model, pool drained -> Claude, reviewer, rounds, result
 ```
 - **Phases.** If your prompt is not phased, Opus phases it. Phase 0 is the foundation. Each later phase builds on the previous one. A multi-step phase is split into parallel tasks on separate files. A single-step phase is one job.
 - **One owner per file.** Two tasks never touch the same file in a phase.
@@ -181,23 +182,25 @@ The 400-line rule and the scores come from Module 3. Opus never spawns a separat
 Still failing after round 3? It goes in the final summary and the build keeps going.
 
 ## When quota runs out
-- A drained model gets a marker file in `.claude/codex-quota/`. Opus skips it for 6 hours.
-- The task moves down the chain: luna, terra, sol, then Claude. Terra goes to sol, then Claude. Sol goes straight to Claude. When the script prints `drained: <chain>` and exits 3, Opus uses `claude-sonnet-builder` for that task.
-- A hard (sol-high) task is never downgraded to luna or terra. Fix rounds never fall back.
-- Delete a marker to clear it.
+All Codex models (luna, terra, sol) share ONE quota pool on your ChatGPT plan. When any model hits a quota error, the pool is drained for all of them.
+- One marker file, `.claude/codex-quota/codex`, records the drain. It counts as fresh for 24 hours: the pool resets weekly, and Opus retries Codex 24 hours after the marker. Delete it to clear it.
+- There is no Codex-to-Codex fallback. A run that hits a quota error, or starts with a fresh marker, prints `drained: codex pool (shared by all models)` and exits 3.
+- **Opus always asks you first.** On a drained pool (at planning, before any phase, or when a task exits 3) Opus stops launching Codex tasks, lets running ones finish, and asks: "Codex pool drained at <time>. Switch the remaining tasks to Module 3 mode (Claude plan only)? Or wait / delete the marker to retry." This is the one question Opus asks in a build. It does nothing on Claude until you say yes.
+- **Module 3 mode** (after a yes) is Claude only, routed by the same scores as Module 3: Opus-trigger tasks (D = 2, two or more 2s, S = 2 and N 1 or more, A = 2 and C = 2) go to `claude-opus-builder`. Easy tasks and read-only scouting go to `claude-haiku-builder`. Everything else (design, S = 2, docs) goes to `claude-sonnet-builder`.
+- Module 3 mode reviews: `sonnet-reviewer` up to 400 changed lines, Opus above that and for opus-builder work. Fixes: same agent, then the next tier up (haiku, sonnet, opus), then `claude-opus-builder`. Up to 3 tasks at once. Plan lines show `(Module 3 mode)`, and the summary lists those tasks.
+- A hard (sol-high) task is never downgraded to luna or terra.
 
 # Part 3: Good to know
 
-- **Parallel runs drain quota faster.** Prefer fewer, bigger tasks.
-- **Default caps:** 3 tasks at once (sol 2, terra 2, luna 3). Claude builder runs count toward the total only. Edit the table in `CLAUDE.md`.
-- **Claude-plan work** (design, security, fix rounds 2 and 3, fallback) uses your Claude plan, not ChatGPT quota.
+- **Parallel runs drain the shared pool faster.** Prefer fewer, bigger tasks.
+- **Default caps:** 3 tasks at once (sol 2, terra 2, luna 3). They limit parallel sessions, not quota. Claude builder runs count toward the total only. Edit the table in `CLAUDE.md`.
+- **Claude-plan work** (design, security, fix rounds 2 and 3, Module 3 mode) uses your Claude plan, not ChatGPT quota.
 - **Edit the tables.** Routing, caps, ladders and the model pool live in `CLAUDE.md`. Model IDs and flags also live at the top of `scripts/codex-run.sh`. Keep both in step.
 - **Review every diff.** File ownership is enforced by instructions, not the filesystem.
 - **Known unknowns:**
   - The `codex exec` flags come from third-party docs. Verify with `codex exec --help` on first run.
-  - Codex concurrency limits and plan limits are unpublished. The caps are guesses.
-  - The 6-hour marker window is a guess.
-  - ChatGPT plan limits may be shared across all Codex models. If so, every Codex model drains together and the work goes to Claude.
+  - Codex concurrency limits are unpublished. The caps are guesses. They limit parallel sessions, not quota.
+  - Confirmed: all Codex models share ONE quota pool on the ChatGPT plan. Per-model draw rates are still unpublished.
   - The real quota and concurrency error wording is unconfirmed. The script matches on guessed keywords.
   - Whether `effort: medium` and `effort: high` in the agent files are honored is unverified.
   - Windows needs Git Bash or WSL for the script.
