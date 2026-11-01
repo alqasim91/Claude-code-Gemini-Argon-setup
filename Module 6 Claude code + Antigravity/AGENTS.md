@@ -1,6 +1,7 @@
-# Project rules (shared by Claude Code and Antigravity/Gemini)
+# Project rules (shared by Claude Code subagents and Antigravity models)
 
 - Your brief lists the files you own (`owns:`). Edit only those files. Reading any file is fine.
+- Your brief may say you are one mini-task of a larger task. Build only your piece, exactly as specced, and match the names and signatures the brief gives. Pieces you were not given are built by other runs: do not build or fix them.
 - Need a change in a file you do not own? Do not make it. Add `needs: <file>: <change>` to your report; an integration task will pick it up.
 - Other agents may be editing other files at the same time. Never revert, reformat or delete changes you did not make. Modified files you did not touch are probably theirs: leave them alone.
 - Do not run repo-wide formatters or codemods, `git checkout`, `git stash`, `git reset`, `git clean`, or dependency installs (npm, pip, etc.) unless your task owns that.

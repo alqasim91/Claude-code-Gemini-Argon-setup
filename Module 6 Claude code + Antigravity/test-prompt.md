@@ -58,7 +58,20 @@ Print: files created, whether the self-check passed, issues found and fixed, and
 ## What to look for
 
 - A plan table is printed before any work starts, with a model chosen for each task.
-- The design and styles task went to Sonnet or Opus, never Gemini.
+- The design and styles task went to `claude-sonnet-builder` or `claude-opus-builder`, never to `agy` (not Argon, not Flash).
 - Parallel tasks were launched together in one message, and no two of them own the same file.
 - The scout checks (links, accessibility, leftover text) went to Flash, and Opus verified what they reported before anything was changed.
+- Each build was reviewed by `sonnet-reviewer` when it had 400 changed lines or fewer. Opus read the diff itself only above 400.
+- A failed review went back to the same Antigravity model first, then to Claude Sonnet high, then Claude Opus medium.
 - Also check the printed "Elapsed: Xm Ys" line and the final per-wave summary.
+
+## Optional: test the drained question
+
+Fake a drained Antigravity before you paste a prompt. In the project folder (Mac, or Git Bash on Windows):
+
+```bash
+mkdir -p .claude/agy-quota
+for m in gemini-4-argon-medium gemini-4-argon-high claude-sonnet-5-5-medium claude-opus-5-5-medium; do date -u +%Y-%m-%dT%H:%M:%SZ > ".claude/agy-quota/$m"; done
+```
+
+Then paste Prompt A. Opus should still build the design shell with a Claude builder, then stop and ask ONE question: "a) switch to Flash, or b) switch to Module 3?" (or "wait for the reset, or switch to Module 3?" if it judges the work too big for Flash). It must not pick for you. Answer a) and check that each task is split into mini-tasks and reviewed once per task, after all its mini-tasks. Delete the marker files when you are done: `rm .claude/agy-quota/*`.
