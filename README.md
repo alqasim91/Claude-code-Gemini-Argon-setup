@@ -15,6 +15,7 @@ Setup guides and ready-to-copy files for running Claude Code (Opus) as the plann
 |---|---|---|
 | Module 3: Claude only | Opus plans, scores and reviews. Haiku scouts, Haiku, Sonnet and Opus build by task difficulty, an Opus fixer takes over after failed reviews. Pro plan only, no `agy` needed. | [Module 3 Claude only](<Module 3 Claude only>) |
 | Module 6: Claude Code + Antigravity (parallel) | Opus plans in waves. Argon, Flash, Sonnet and Opus build several tasks at once through `agy`. Three fix rounds, quota fallback. | [Module 6 Claude code + Antigravity](<Module 6 Claude code + Antigravity>) |
+| Module 6: Claude Code + Antigravity, Flash builder | Same as Module 6, but Gemini Flash (high) builds every task that splits into small, exact pieces; Argon builds the rest and fixes Flash's work. Saves the small Argon pool. | [Module 6 Claude Code + Antigravity - Flash builder](<Module 6 Claude Code + Antigravity - Flash builder>) |
 | Module 7: Claude Code + Codex (parallel) | Opus plans in phases. Luna, Terra and Sol build several tasks at once through `codex exec` on a ChatGPT plan. No relay subagent, graded reviews, three fix rounds, quota fallback. | [Module 7 Claude code + Codex](<Module 7 Claude code + Codex>) |
 
 Open the module's `README.md` for the step-by-step setup on Mac and Windows, and `test-prompt.md` for a ready test prompt.
@@ -32,6 +33,13 @@ Module 6 Claude code + Antigravity/
   CLAUDE.md                             routing rules (project root)
   AGENTS.md                             same rules for other tools (project root)
   agents/                               subagents (go to .claude/agents/)
+  test-prompt.md
+Module 6 Claude Code + Antigravity - Flash builder/
+  README.md                             steps and how it works
+  CLAUDE.md                             routing rules (project root)
+  AGENTS.md                             same rules for other tools (project root)
+  agents/                               7 subagents (go to .claude/agents/)
+  module-6-flash-files.zip              the same files, zipped
   test-prompt.md
 Module 7 Claude code + Codex/
   README.md                             steps and how it works
