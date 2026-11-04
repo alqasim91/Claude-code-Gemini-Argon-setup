@@ -53,6 +53,13 @@ cp module-7/scripts/codex-run.sh scripts/
 chmod +x scripts/codex-run.sh
 echo ".claude/codex-quota/" >> .gitignore
 ```
+Files already sitting in the project root (`CLAUDE.md`, `AGENTS.md`, `agents/`, `scripts/` next to each other, no `module-7` folder)? Use this instead. It moves the agents into `.claude/agents/` and removes the empty `agents` folder:
+```bash
+mkdir -p .claude/agents .claude/codex-quota
+mv agents/*.md .claude/agents/ && rmdir agents
+chmod +x scripts/codex-run.sh
+echo ".claude/codex-quota/" >> .gitignore
+```
 **Check it worked.** `.claude` is hidden in Finder (`Cmd+Shift+.` shows it). In Terminal:
 ```bash
 ls -la .claude/agents scripts
@@ -65,6 +72,13 @@ New-Item -ItemType Directory -Force .claude\agents, .claude\codex-quota, scripts
 Copy-Item module-7\CLAUDE.md, module-7\AGENTS.md .
 Copy-Item module-7\agents\*.md .claude\agents\
 Copy-Item module-7\scripts\codex-run.sh scripts\
+Add-Content .gitignore ".claude/codex-quota/"
+```
+Files already in the project root (no `module-7` folder)? Use this instead:
+```powershell
+New-Item -ItemType Directory -Force .claude\agents, .claude\codex-quota | Out-Null
+Move-Item agents\*.md .claude\agents\
+Remove-Item agents
 Add-Content .gitignore ".claude/codex-quota/"
 ```
 Already have a `CLAUDE.md` or `AGENTS.md`? Do not overwrite it. Paste the new text into your existing file instead.
