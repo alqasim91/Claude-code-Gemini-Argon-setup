@@ -54,6 +54,13 @@ cp module-8/scripts/opencode-run.sh scripts/
 chmod +x scripts/opencode-run.sh
 echo ".claude/opencode-quota/" >> .gitignore
 ```
+Files already sitting in the project root (`CLAUDE.md`, `AGENTS.md`, `agents/`, `scripts/` next to each other, no `module-8` folder)? Use this instead. It moves the agents into `.claude/agents/` and removes the empty `agents` folder:
+```bash
+mkdir -p .claude/agents .claude/opencode-quota
+mv agents/*.md .claude/agents/ && rmdir agents
+chmod +x scripts/opencode-run.sh
+echo ".claude/opencode-quota/" >> .gitignore
+```
 **Check it worked.** In Terminal: `ls -la .claude/agents scripts`. You should see `claude-sonnet-builder.md`, `claude-opus-builder.md`, `claude-haiku-builder.md`, `sonnet-reviewer.md`, `scout.md` and an executable `opencode-run.sh`.
 
 **Windows (PowerShell)**
@@ -62,6 +69,13 @@ New-Item -ItemType Directory -Force .claude\agents, .claude\opencode-quota, scri
 Copy-Item module-8\CLAUDE.md, module-8\AGENTS.md .
 Copy-Item module-8\agents\*.md .claude\agents\
 Copy-Item module-8\scripts\opencode-run.sh scripts\
+Add-Content .gitignore ".claude/opencode-quota/"
+```
+Files already in the project root (no `module-8` folder)? Use this instead:
+```powershell
+New-Item -ItemType Directory -Force .claude\agents, .claude\opencode-quota | Out-Null
+Move-Item agents\*.md .claude\agents\
+Remove-Item agents
 Add-Content .gitignore ".claude/opencode-quota/"
 ```
 Already have a `CLAUDE.md` or `AGENTS.md`? Do not overwrite it. Paste the new text into your existing file instead. OpenCode reads `AGENTS.md` too, which is how the free models get the rules.
