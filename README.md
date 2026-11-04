@@ -17,6 +17,7 @@ Setup guides and ready-to-copy files for running Claude Code (Opus) as the plann
 | Module 6: Claude Code + Antigravity (parallel) | Opus plans in waves. Argon, Flash, Sonnet and Opus build several tasks at once through `agy`. Three fix rounds, quota fallback. | [Module 6 Claude code + Antigravity](<Module 6 Claude code + Antigravity>) |
 | Module 6: Claude Code + Antigravity, Flash builder | Same as Module 6, but Gemini Flash (high) builds every task that splits into small, exact pieces; Argon builds the rest and fixes Flash's work. Saves the small Argon pool. | [Module 6 Claude Code + Antigravity - Flash builder](<Module 6 Claude Code + Antigravity - Flash builder>) |
 | Module 7: Claude Code + Codex (parallel) | Opus plans in phases. Luna, Terra and Sol build several tasks at once through `codex exec` on a ChatGPT plan. No relay subagent, graded reviews, three fix rounds, quota fallback. | [Module 7 Claude code + Codex](<Module 7 Claude code + Codex>) |
+| Module 8: Claude Code + OpenCode free models (parallel) | Opus plans in phases. Ten free OpenCode models build tasks at once through `opencode run`; the script falls back to the next model when one hits its free limit. Zero-retention models for private code, graded reviews, four fix rounds, Module 3 fallback. | [Module 8 Claude + Opencode Free](<Module 8 Claude + Opencode Free>) |
 
 Open the module's `README.md` for the step-by-step setup on Mac and Windows, and `test-prompt.md` for a ready test prompt.
 
@@ -48,4 +49,13 @@ Module 7 Claude code + Codex/
   agents/                               3 subagents (go to .claude/agents/)
   scripts/codex-run.sh                  Codex runner (go to scripts/, chmod +x)
   test-prompt.md
+Module 8 Claude + Opencode Free/
+  README.md                             steps and how it works
+  CLAUDE.md                             routing rules (project root)
+  AGENTS.md                             shared rules for OpenCode models and builders (project root)
+  agents/                               5 subagents (go to .claude/agents/)
+  scripts/opencode-run.sh               OpenCode runner (go to scripts/, chmod +x)
+  module-8-files.zip                    the same files, zipped
+  test-prompt.md
+  model-research.md                     notes on the free models
 ```
