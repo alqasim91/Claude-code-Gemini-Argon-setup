@@ -37,7 +37,7 @@ opencode run --help
 This module uses `-m`, `--variant`, `--dir`, `--agent`. They are confirmed on your install (2026-11-04). It never uses `--auto`. One flag is still unverified: the script runs read-only scouting with `--agent plan`. Check with `opencode agent list` that a read-only `plan` agent exists. If not, edit `AGENT_READONLY` at the top of the script.
 
 ## Step 4. Copy the files into your project
-Unzip `module-8-files.zip` into a new folder named `module-8` that sits **inside your project folder** (the zip has no top folder, so create `module-8` first). Open a terminal in the project folder.
+Unzip `module-8-files.zip` **inside your project folder**. It creates a `module-8` folder there. Open a terminal in the project folder (the one that now contains `module-8`).
 
 You are copying:
 - `CLAUDE.md` and `AGENTS.md` to the project root.
