@@ -37,7 +37,7 @@ opencode run --help
 This module uses `-m`, `--variant`, `--dir`, `--agent`. They are confirmed on your install (2026-11-04). It never uses `--auto`. One flag is still unverified: the script runs read-only scouting with `--agent plan`. Check with `opencode agent list` that a read-only `plan` agent exists. If not, edit `AGENT_READONLY` at the top of the script.
 
 ## Step 4. Copy the files into your project
-Unzip `module-8-files.zip` into a new folder named `module-8` that sits **inside your project folder** (the zip has no top folder, so create `module-8` first). Open a terminal in the project folder.
+Unzip `module-8-files.zip` **inside your project folder**. It creates a `module-8` folder there. Open a terminal in the project folder (the one that now contains `module-8`).
 
 You are copying:
 - `CLAUDE.md` and `AGENTS.md` to the project root.
@@ -54,6 +54,13 @@ cp module-8/scripts/opencode-run.sh scripts/
 chmod +x scripts/opencode-run.sh
 echo ".claude/opencode-quota/" >> .gitignore
 ```
+Files already sitting in the project root (`CLAUDE.md`, `AGENTS.md`, `agents/`, `scripts/` next to each other, no `module-8` folder)? Use this instead. It moves the agents into `.claude/agents/` and removes the empty `agents` folder:
+```bash
+mkdir -p .claude/agents .claude/opencode-quota
+mv agents/*.md .claude/agents/ && rmdir agents
+chmod +x scripts/opencode-run.sh
+echo ".claude/opencode-quota/" >> .gitignore
+```
 **Check it worked.** In Terminal: `ls -la .claude/agents scripts`. You should see `claude-sonnet-builder.md`, `claude-opus-builder.md`, `claude-haiku-builder.md`, `sonnet-reviewer.md`, `scout.md` and an executable `opencode-run.sh`.
 
 **Windows (PowerShell)**
@@ -62,6 +69,13 @@ New-Item -ItemType Directory -Force .claude\agents, .claude\opencode-quota, scri
 Copy-Item module-8\CLAUDE.md, module-8\AGENTS.md .
 Copy-Item module-8\agents\*.md .claude\agents\
 Copy-Item module-8\scripts\opencode-run.sh scripts\
+Add-Content .gitignore ".claude/opencode-quota/"
+```
+Files already in the project root (no `module-8` folder)? Use this instead:
+```powershell
+New-Item -ItemType Directory -Force .claude\agents, .claude\opencode-quota | Out-Null
+Move-Item agents\*.md .claude\agents\
+Remove-Item agents
 Add-Content .gitignore ".claude/opencode-quota/"
 ```
 Already have a `CLAUDE.md` or `AGENTS.md`? Do not overwrite it. Paste the new text into your existing file instead. OpenCode reads `AGENTS.md` too, which is how the free models get the rules.
