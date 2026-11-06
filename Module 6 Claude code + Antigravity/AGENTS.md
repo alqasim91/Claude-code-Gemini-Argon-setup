@@ -7,6 +7,7 @@
 - Do not run repo-wide formatters or codemods, `git checkout`, `git stash`, `git reset`, `git clean`, or dependency installs (npm, pip, etc.) unless your task owns that.
 - Never commit or push. Leave changes uncommitted for review.
 - Run the project's tests/lint before reporting done, if they exist and your mode allows shell commands; scope them to your files where possible. Failures in files you do not own: report them, do not fix them. If checks were not run, say so.
-- Do not read or edit secrets (.env, keys, credentials).
+- Never read, edit, copy or link secrets: env files (`.env`, `.env.local` and so on), keys, credentials. This includes copying or linking an env file into a worktree. If your task seems to need one, stop and report it as a blocker; do not work around it.
+- Scratch databases: you may test migrations on a local, throwaway database (for example a temporary local Postgres) that holds no real data and uses no real credentials. Never touch a real or shared database.
 - Scratch files go in /tmp, not in the repo.
 - Final report: files changed, checks run, `needs:` lines, anything not done. Max 10 lines.

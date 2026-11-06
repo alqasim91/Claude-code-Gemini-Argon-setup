@@ -57,12 +57,15 @@ Print: files created, whether the self-check passed, issues found and fixed, and
 
 ## What to look for
 
-- A plan table is printed before any work starts, with a model chosen for each task.
+- A plan table is printed first, before any work starts or any file is edited, with a route for every task (sensitive ones labeled `opus-sensitive (reason)`).
+- The main chat edits no project files and runs no builds: every edit, even sensitive work, comes from a sub-agent.
+- Sensitive means the sensitive files only (migrations, access policies, money or stock functions, auth, crypto) and those go to `claude-opus-builder`; the UI, types and labels of the same feature go through normal routing.
 - The design and styles task went to `claude-sonnet-builder` or `claude-opus-builder`, never to `agy` (not Argon, not Flash).
 - Parallel tasks were launched together in one message, and no two of them own the same file.
 - The scout checks (links, accessibility, leftover text) went to Flash, and Opus verified what they reported before anything was changed.
-- Each build was reviewed by `sonnet-reviewer` when it had 400 changed lines or fewer. Opus read the diff itself only above 400.
+- Every task that edits files got a reviewer sub-agent. Each build was reviewed by `sonnet-reviewer` when it had 400 changed lines or fewer. `opus-reviewer` (a sub-agent) reviewed it above 400, and the main chat never read a full diff.
 - A failed review went back to the same Antigravity model first, then to Claude Sonnet high, then Claude Opus medium.
+- A summary table is printed at the end, even if all the work went to one sub-agent.
 - Also check the printed "Elapsed: Xm Ys" line and the final per-wave summary.
 
 ## Optional: test the drained question

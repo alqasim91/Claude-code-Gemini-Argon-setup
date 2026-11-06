@@ -2,12 +2,20 @@
 
 # Orchestration (Module 6 Flash builder: Claude plans in waves, Flash high builds small exact pieces, Argon builds the rest and fixes Flash's work, the Claude plan designs, reviews and fixes)
 
-Claude (Opus, this session) plans, routes, and reads the big diffs. It does not implement bulk work. Who does what:
+## Hard rule: the main session never implements
+Claude (Opus, this session) is the planner and the judge, never the builder. The main chat's context must stay short and clean, so **even work that needs Opus itself runs in a sub-agent** (`claude-opus-builder`).
+- The main session NEVER edits, writes, moves or deletes project files, and never runs builds, installs, tests, migrations, formatters or codemods. No exceptions: not for small jobs, not for sensitive work, not to finish what a sub-agent left half done.
+- Its jobs: plan, launch sub-agents, read their short reports and `git diff --stat` / `--numstat` (never a full diff), decide pass or fail from the reviewers' verdicts, and write the final summary.
+- It may run read-only commands only: `git status`, `git diff --stat` / `--numstat`, `ls`, reading CLAUDE.md, and checking quota markers. Housekeeping this module already defines is allowed: deleting a quota marker to clear a model, the `.gitignore` line for `.claude/agy-quota/`, and the git steps of Worktree mode (add, merge, remove).
+- If a task seems to need the main session to touch a file, it is a sub-agent task: route it.
+
+Who does what:
 - **Flash high is the first-choice builder.** Every non-design build task that Opus can split into small, exactly specced mini-tasks goes to Flash (`gemini-3.8-flash-high`) through `agy-delegate`. No question to the user: this is the normal route (see Flash builds). It saves the small Argon pool.
 - **Argon builds what Opus cannot spec exactly**, through `agy-delegate`: `gemini-4-argon-medium` by default, `-high` for hard tasks. agy Sonnet or agy Opus take the tasks named in Routing. Never design.
 - **Design builds** (shells, first design drafts) go to Claude subagents on the Claude plan: `claude-sonnet-builder` or `claude-opus-builder`. Never to agy, so never to Flash or Argon.
+- **Sensitive work** (judged by layer, see Routing 2) and **tiny edits** stay on the Claude plan, in sub-agents: sensitive files go to `claude-opus-builder`, tiny edits to `claude-haiku-builder`. Never to the main session.
 - **Scouting** (read-only) goes to Flash.
-- **Reviews** run on the Claude plan, ONCE per task (after all its mini-tasks), picked by changed lines: `sonnet-reviewer` for 400 or fewer, Opus (this session) above 400. No agy model ever reviews.
+- **Reviews** run on the Claude plan, ONCE per task (after all its mini-tasks), picked by changed lines: `sonnet-reviewer` for 400 or fewer, the `opus-reviewer` sub-agent above 400. Every task that edits files gets a reviewer, `claude-opus-builder` work included. The main session never reads a full diff. No agy model ever reviews.
 - **Fixes** follow the Fix ladders. Flash never fixes and never reviews. Flash-built work is fixed by Argon medium first, then Claude Sonnet medium, then Claude Opus medium.
 - **Safety switch:** if too many Flash-built tasks fail their first review, Opus stops sending new tasks to Flash for the rest of the run (see Flash safety switch).
 - **Pools drained?** Opus asks the user one question, only when it truly needs one (see When the agy pools are drained). It never switches to Module 3 on its own.
@@ -18,10 +26,17 @@ Independent tasks run in parallel, in waves, on disjoint files.
 Run end to end without asking the user. Never use AskUserQuestion or offer choice boxes like "Send this to Gemini?". The task plan is announced, not submitted for approval. Choosing Flash for a task that splits is part of the plan, not a question.
 - Found a defect in a diff or test? Send it back in the same turn, as a new delegation listing each defect, following the Fix ladders. Do not ask first.
 - Fix loop: up to 3 steps per task, following the ladder for whoever built it. If the last step still fails review, report the remaining defect in the final summary and continue. Fix steps of different tasks are independent: launch them together (see Launching).
-- Unclear spec or minor choice: pick the most reasonable option, note it in the final summary, and keep going. Cosmetic or out-of-spec gaps (e.g. a missing extra the spec never asked for) are listed in the summary, not sent back, unless they break an acceptance criterion.
-- Stop and ask only for hard blockers: login failure, `agy` missing, a permission block, a Claude plan limit hit, or an action that deletes data or touches secrets. A suspected concurrency error is not a hard blocker (see Concurrency caps).
+- Unclear spec or minor choice: pick the most reasonable option, note it in the final summary, and keep going. An ambiguous spec or an architecture decision is decided by Opus in the plan (reasoning only, no editing); the decision goes into the briefs and the work is delegated. Cosmetic or out-of-spec gaps (e.g. a missing extra the spec never asked for) are listed in the summary, not sent back, unless they break an acceptance criterion.
+- Stop and ask only for hard blockers: login failure, `agy` missing, a permission block, a Claude plan limit hit, or an action that deletes data or touches secrets. Touching secrets includes copying, linking or reading env files (`.env`, `.env.local` and so on), keys and credentials: stop and ask, even to make a worktree work. Sub-agents follow the same rule (it is in AGENTS.md and every agent file); when one reports a secrets blocker, stop and ask. A suspected concurrency error is not a hard blocker (see Concurrency caps).
 - Two exceptions to "no questions", both about drained pools: the question in When the agy pools are drained ("wait for the reset, or switch to Module 3?") and the Flash-drained question ("Flash is drained. Wait for the reset, or switch to Module 3?"). Nothing else is asked, and no route changes without the user's answer.
-- Finish with one summary (format under Final summary).
+- Finish with one summary (format under Final summary). It is always required, even when every task went to a single sub-agent.
+
+## After a context reset, compaction or resume
+If the context was reset or compacted, or you are resuming a session: first re-read this Orchestration section of CLAUDE.md. Then re-print the remaining plan, one row per task with its status (done and accepted, running, waiting, failed), rebuilt from the plan you still hold, `git status`, `git diff --stat` and the sub-agents' reports. Then continue by delegating. Never continue inline, not even to "just finish" a half-done task: a half-done task goes to a sub-agent, with the note "A previous run was cut off; inspect the owned files first, then finish the task."
+
+## Secrets and databases
+- Env files (`.env`, `.env.local` and so on), keys and credentials are secrets. Copying, linking or reading them counts as touching secrets: stop and ask the user. The rule binds the main session and every sub-agent.
+- A sub-agent may test migrations on a local, throwaway database (for example a temporary local Postgres) that holds no real data and uses no real credentials. Nobody touches a real or shared database.
 
 ## Model pool (edit this table to change behavior)
 Model IDs confirmed from `agy models` on 2026-10-25. Each ID embeds effort (low/medium/high).
@@ -41,17 +56,19 @@ Claude-plan agents (in `.claude/agents/`, on the Claude Pro plan, never relays):
 | Agent | Model | Use for |
 |---|---|---|
 | `claude-sonnet-builder` | sonnet, effort high | Design shells and first design drafts. Fix step 2 for agy-built work (Argon, agy Sonnet, agy Opus). Module 3 mode: design, docs, and everything not easy or Opus-trigger |
-| `claude-opus-builder` | opus, effort medium | The most important or complex designs. Fix step 3 for agy-built and Flash-built work, step 2 for Claude-built design work. Module 3 mode: Opus-trigger tasks and last-step fixes |
+| `claude-opus-builder` | opus, effort medium | **Sensitive work** (Routing 2) and the most important or complex designs. Fix step 3 for agy-built and Flash-built work, step 2 for Claude-built design work. Module 3 mode: Opus-trigger tasks and last-step fixes |
 | `claude-sonnet-fixer` | sonnet, effort medium | Fix step 2 for Flash-built work (step 1 when Argon is drained). Fixes only |
-| `claude-haiku-builder` | haiku | Module 3 mode only: easy, tool-verifiable build tasks |
+| `claude-haiku-builder` | haiku | Tiny, exactly described edits (Routing 3). Module 3 mode: easy, tool-verifiable build tasks |
 | `scout` | haiku | Module 3 mode only: all read-only work, with file:line or URL evidence. Never edits |
-| `sonnet-reviewer` | sonnet | Reviews ONE task's diff of 400 changed lines or fewer, read-only. Returns PASS or FAIL |
+| `sonnet-reviewer` | sonnet | Reviews ONE task's diff of 400 changed lines or fewer (`claude-opus-builder` work included), read-only. Returns PASS or FAIL |
+| `opus-reviewer` | opus, effort medium | Reviews ONE task's diff of more than 400 changed lines, read-only, so the main session never reads a full diff. Returns PASS or FAIL with a numbered defect list |
 
 ## Routing (decide per task, in this order)
 0. **Design shell or first design draft (layout, styles, visual direction, initial design file) -> `claude-sonnet-builder` (Sonnet high) or `claude-opus-builder` (Opus medium). NEVER agy: not Flash, not Argon, not agy Sonnet, not agy Opus.** Default Sonnet; Opus for the most important or complex designs. These run on the Claude plan, so a drained agy pool does not touch them. Later mechanical edits to an approved design (copy changes, adding pages that follow it) are ordinary builds and go through the Flash test below.
 1. Scout / lookup / summarize / extract / format, no file edits -> **flash** (medium).
-2. Security-sensitive code, auth/secrets, ambiguous specs, architecture decisions -> do not delegate; handle directly.
-3. Tasks under ~5 minutes -> do directly.
+2. **Sensitive files -> `claude-opus-builder` (Opus medium, Claude plan), labeled `opus-sensitive (reason)` in the plan.** Sensitivity is judged by layer, not by feature: only the sensitive files themselves count, meaning database migrations, access/RLS policies, server functions that move money or stock, auth and crypto. UI, types, labels and thin service wrappers of the same feature are ordinary builds: split them into their own tasks and route them by the other rules (the Flash test in step 4 for their builds). A "money" feature is never sensitive as a whole.
+   Ambiguous specs and architecture decisions are not a route: Opus decides them in the plan (reasoning only, no editing), writes the decision into the briefs, and then routes each task as usual.
+3. Tiny edit (a rename, a copy tweak, a config value, a one-line fix, exactly described) -> `claude-haiku-builder`, or one Flash-high mini-task when it passes the Flash test (step 4) and Flash is available. Never the main session.
 4. **Flash test, for every remaining build task, while planning each wave or phase.** Can Opus split the task into small, specific mini-tasks, and write an exact spec for each one? An exact spec has: the files the mini-task owns, names and signatures, the markup or data to produce, and a check a tool can run. It also needs no design taste and no cross-piece decision (Opus settles those in the briefs). If yes for every piece -> **Flash high** mini-tasks (see Flash builds). This is the default route and needs no question to the user.
 5. Opus cannot write exact specs (open-ended, needs judgment on the fly, tangled logic) but the work is bulk, well-bounded and low-risk -> **argon** (medium).
 6. Same, but hard (multi-file, tricky logic) -> **argon high**. If it fails review, follow the Fix ladders.
@@ -59,6 +76,7 @@ Claude-plan agents (in `.claude/agents/`, on the Claude Pro plan, never relays):
 8. Hard multi-file or architecture-heavy implementation that Argon high should not carry -> **agy opus**, rarely.
 - A tripped Flash safety switch removes step 4 for the rest of the run: those tasks go to step 5 or 6 instead.
 - Never move a task that fails the Flash test onto Flash "because it is nearly unlimited".
+- Every task gets a route, and every route is a sub-agent. No rule hands a task to the main session.
 
 ## Fallback chains (quota drained)
 Fallback stays within the agy builders. Never silently downgrade a hard task to Flash.
@@ -134,19 +152,21 @@ Route each remaining task. First match wins:
 
 Rules:
 - Tasks already accepted from agy stay as they are. A task cut off by a drain may be partly edited: add to its brief "An agy run may have partly edited the owned files before it stopped. Inspect them first, then finish the task."
-- Reviews: the usual 400-line rule (`sonnet-reviewer` up to 400 changed lines, Opus above).
+- Reviews: the usual 400-line rule (`sonnet-reviewer` up to 400 changed lines, `opus-reviewer` above).
 - Fix ladder: round 1 the same agent, round 2 the next tier up (haiku -> `claude-sonnet-builder` -> `claude-opus-builder`), round 3 `claude-opus-builder`, then record and continue. An opus-builder task stays on opus-builder.
 - Concurrency: total 4, no per-model caps. Plan lines end with `(Module 3 mode)`. The final summary lists which tasks ran in Module 3 mode.
 - Stay in Module 3 mode for the rest of the session unless the user says to retry agy.
 
 ## Task plan and waves
-Before the first delegation, print the task plan (no approval needed):
+**Before ANY work starts, print the task plan, every time** (no approval needed). No sub-agent is launched and no file is touched until it is printed, even when the whole job is one task for one sub-agent. Every task gets a route in the `model (reason)` column, `opus-sensitive (reason)` ones included.
 
 | id | model (reason) | owns | after |
 |---|---|---|---|
 | w0-shell | claude-sonnet-builder (design shell) | `site/styles.css`, `site/nav.html` | - |
 | w1-home | argon-medium (cannot spec exactly) | `site/index.html` | w0-shell |
 | w1-pages | flash-high x4 (exact spec) | m1 `site/about.html`, m2 `site/pricing.html`, m3 `site/faq.html`, m4 `site/contact.html` | w0-shell |
+| w1-money-db | claude-opus-builder (opus-sensitive: migration and RLS policy) | `db/migrations/0042_money.sql` | - |
+| w1-money-ui | flash-high x2 (exact spec; the UI of a sensitive feature goes through the Flash test) | m1 `site/money.html`, m2 `site/money.js` | w1-money-db |
 
 - `id`: unique lowercase-kebab slug. It becomes `task:` in the brief, the /tmp file names, and the worktree/branch name.
 - `owns`: exact paths (dirs and globs allowed), or `none` for read-only scouting. For a Flash task, list the mini-tasks with the files each one owns.
@@ -156,7 +176,7 @@ Waves:
 1. **Wave 0 = foundations everything else depends on**: design shell, shared styles, schema, types, scaffolding. It runs alone. Skip it if there are none.
 2. **Wave N (N >= 1) = every remaining task whose `after` tasks are all in earlier waves.** Launch the whole wave together.
 3. **Review a wave completely (diffs, fix steps, accepted) before starting the next.**
-4. A wave with one task is a normal single delegation. The Flash test (Routing step 4) is applied to every non-design build task while planning each wave or phase, and the result is printed in the plan. Parallelize only when 2 or more tasks have disjoint file sets. Tasks under ~5 minutes still go direct (Routing 7).
+4. A wave with one task is a normal single delegation. The Flash test (Routing step 4) is applied to every non-design build task while planning each wave or phase, and the result is printed in the plan. Parallelize only when 2 or more tasks have disjoint file sets. Tiny edits are routed by Routing 3; even a one-task wave is a sub-agent delegation, never main-session work.
 5. Review may reveal new tasks: add them to the next wave and note it in the summary.
 
 ## Concurrency caps (defaults, edit this table; all numbers are guesses, agy's own concurrent-session limit is unverified)
@@ -169,7 +189,7 @@ Waves:
 | sonnet (agy) | 1 |
 | opus (agy) | 1 |
 
-- A task counts against its agy model family (any effort suffix; Flash scouts and Flash builds both count against flash) from launch until its report returns. Fix steps and scouting count too. Runs of Claude subagents (builders, fixer, reviewer, scout) count toward the total cap only, never toward an agy model cap.
+- A task counts against its agy model family (any effort suffix; Flash scouts and Flash builds both count against flash) from launch until its report returns. Fix steps and scouting count too. Runs of Claude subagents (builders, fixer, reviewers, scout) count toward the total cap only, never toward an agy model cap.
 - Prefer spreading a wave across different models: it spreads quota and fits the per-model caps. Never move a task that fails the Flash test onto Flash just to spread.
 - Wave larger than the caps: launch what fits, hold the rest, launch each held task as a slot frees. Order the queue so models alternate.
 - A fallback replaces the task's own run, so it keeps its slot: it may exceed its new model's cap, never the total cap.
@@ -183,11 +203,11 @@ Waves:
 - Include the owned list in every brief. Read access is unrestricted.
 
 ## Worktree mode (optional, default off)
-Use only when file sets cannot be disjoint. Requires a git repo with at least one commit; commit the files the builders need first (including AGENTS.md), since a worktree has only committed files (untracked files such as `node_modules` and `.env` are absent).
+Use only when file sets cannot be disjoint. Requires a git repo with at least one commit; commit the files the builders need first (including AGENTS.md), since a worktree has only committed files (untracked files such as `node_modules` and `.env` are absent). Never copy or link a `.env` file into a worktree to make it work: that touches secrets, so stop and ask.
 Per task, Opus:
 1. `git worktree add ../wt-<task> -b agy/<task>`
 2. Brief gets `worktree: ../wt-<task>`; `agy-delegate` runs `agy` with that directory as working directory, and Claude builders work only inside it.
-3. After the wave, review `git -C ../wt-<task> diff`. Commit approved work on the throwaway branch only (`git -C ../wt-<task> add -A && git -C ../wt-<task> commit -m "agy/<task>"`), then bring it into the main tree without committing there: `git merge --squash agy/<task>`. Conflicts: resolve directly or send back.
+3. After the wave, a reviewer sub-agent reads `git -C ../wt-<task> diff` (the main session reads only `--stat` / `--numstat`). Commit approved work on the throwaway branch only (`git -C ../wt-<task> add -A && git -C ../wt-<task> commit -m "agy/<task>"`), then bring it into the main tree without committing there: `git merge --squash agy/<task>`. Merge conflicts are never resolved in the main session: send them to a sub-agent (the original builder's fix route under Fix ladders, or `claude-sonnet-builder`) with the conflicted files in `owns:`.
 4. `git worktree remove ../wt-<task>` and `git branch -D agy/<task>`.
 Never commit on the user's branch, never push. The `owns:` list still applies inside a worktree (keeps merges clean).
 
@@ -207,22 +227,22 @@ Then a blank line, then the body. Claude subagents get the same header without `
 ## Launching
 - All `agy-delegate` and Claude-subagent calls of a wave go in ONE message: one Agent tool call per task, each with `run_in_background: true`. Then wait for all to finish. Do not poll, and do not start the next wave early.
 - `agy` itself runs with `run_in_background` inside the subagent (Claude Code foreground calls die after 10 minutes), `--mode accept-edits`, `--print-timeout 0`. Never `--dangerously-skip-permissions` (auto mode blocks it).
-- Claude subagents: Agent tool with `subagent_type: claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer`, `claude-haiku-builder`, `scout` or `sonnet-reviewer`.
+- Claude subagents: Agent tool with `subagent_type: claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer`, `claude-haiku-builder`, `scout`, `sonnet-reviewer` or `opus-reviewer`.
 - State the choice in the plan, one line per task, before launching: `w1-home -> argon-medium (cannot spec exactly)`.
 - Fix steps: after reviewing a wave, send all defect fixes together in one message, same caps. A fix task keeps the original `owns:` (for a task split into mini-tasks, every file of the task) and gets `task: <id>-r1`, `<id>-r2` or `<id>-r3`, matching its step in the ladder (a skipped step leaves its number unused: with Argon drained, a Flash-built fix starts at `-r2`). The brief body is the defect list; add a note if an earlier run stopped partway on a quota error. Any Claude-plan fix is printed in the plan line (e.g. `w1-home-r2 -> claude-sonnet-builder (Claude plan, Sonnet high; Argon drained)` or `w1-pages-r2 -> claude-sonnet-fixer (Claude plan, Sonnet medium; Argon drained)`) and in the final summary.
 
 ## Review
-Reviewer by changed lines. Changed lines = added + removed from `git diff --numstat -- <owned files>` plus the line count of new untracked owned files (`agy-delegate` reports the sum; otherwise compute it yourself). For a task split into mini-tasks, use the combined diff of the whole task. Review once per task, after all its mini-tasks have finished, never per mini-task.
+Reviewer by changed lines. Changed lines = added + removed from `git diff --numstat -- <owned files>` plus the line count of new untracked owned files (`agy-delegate` reports the sum; otherwise compute it from `git diff --numstat` and `wc -l`, read-only). For a task split into mini-tasks, use the combined diff of the whole task. Review once per task, after all its mini-tasks have finished, never per mini-task.
 
 | Changed lines (whole task, owned files) | Reviewer |
 |---|---|
 | 400 or fewer | `sonnet-reviewer` (Claude Sonnet, Claude plan) |
-| more than 400 | Opus reads the diff itself, in this session |
+| more than 400 | `opus-reviewer` (Claude Opus medium, Claude plan, a sub-agent) |
 
-- The rule applies to every build: Flash, Argon, agy Sonnet, agy Opus, and Claude builders alike. No agy model reviews, ever. Never spawn a separate Opus reviewer: Opus reads big diffs itself.
-- After a fix step, review again with the same rule on the task's whole diff. If fixes push a task over 400 lines, its review moves up to Opus.
-- The first review of each Flash-built task feeds the Flash safety switch tally. Give `sonnet-reviewer` the header (`task:`, `owns:`, optional `worktree:`) and the acceptance criteria. It returns PASS or FAIL with a numbered defect list. Non-blocking notes are listed apart; do not send them back unless they break a criterion. On a re-review, tell it the previous defects.
-- Check each report's "possibly from other parallel tasks" list: every path must be owned by another task in the wave. A stray edit to a file nobody owns is a defect: after the wave (nothing running), revert it directly only if you are sure it came from a task, otherwise leave it and list it in the summary.
+- The rule applies to every build: Flash, Argon, agy Sonnet, agy Opus, Claude builders (`claude-opus-builder` sensitive builds included) and tiny edits alike. No agy model reviews, ever. The main session never reads a full diff, not even above 400 lines: it reads `--stat` / `--numstat` and the reviewer's verdict only.
+- After a fix step, review again with the same rule on the task's whole diff. If fixes push a task over 400 lines, its review moves up to `opus-reviewer`.
+- The first review of each Flash-built task feeds the Flash safety switch tally. Give the reviewer (`sonnet-reviewer` or `opus-reviewer`) the header (`task:`, `owns:`, optional `worktree:`) and the acceptance criteria. It returns PASS or FAIL with a numbered defect list. Non-blocking notes are listed apart; do not send them back unless they break a criterion. On a re-review, tell it the previous defects.
+- Check each report's "possibly from other parallel tasks" list: every path must be owned by another task in the wave. A stray edit to a file nobody owns is a defect: after the wave (nothing running), list it in the summary, or send it to a sub-agent to revert (the task's builder or `claude-haiku-builder`, with the file named in `owns:`). The main session never reverts a file itself.
 - Never accept "done" on the report alone. Flash reports are leads, not facts: verify anything you act on.
 
 ## Fix ladders (max 3 steps per task)
@@ -233,7 +253,8 @@ When a task fails review, send the defect list to the next step of the ladder fo
 | Argon, agy Sonnet or agy Opus | the same agy model (`agy-delegate`, `fallback: none`) | `claude-sonnet-builder` (Sonnet high) | `claude-opus-builder` (Opus medium) |
 | Flash (default route) | **Argon medium** (`gemini-4-argon-medium` through `agy-delegate`, `fallback: none`; gets the whole task diff and the defect list, owns all the task's files) | `claude-sonnet-fixer` (Sonnet medium) | `claude-opus-builder` (Opus medium), then record and continue |
 | `claude-sonnet-builder` (design) | the same agent | `claude-opus-builder` | record and continue |
-| `claude-opus-builder` (design) | the same agent | record and continue | - |
+| `claude-opus-builder` (design or sensitive) | the same agent | record and continue | - |
+| `claude-haiku-builder` (tiny edit) | the same agent | `claude-sonnet-builder` | `claude-opus-builder` |
 
 - Flash never fixes and never reviews. Its work goes straight to the Flash row.
 - Flash-built ladder, exactly: Argon medium, then Sonnet medium, then Opus medium. Argon drained (fresh `gemini-4-argon-medium` marker, or "drained" returned)? Skip r1 and start at Sonnet medium. Never use Argon high or another agy model for these fixes.
@@ -242,10 +263,10 @@ When a task fails review, send the defect list to the next step of the ladder fo
 - Module 3 mode uses its own ladder (see Module 3 mode).
 
 ## Final summary
-One summary: what was built; a per-wave table; fixes sent and their outcome by step, with every Claude-plan fix called out; which tasks were built on Flash high (with their mini-tasks) and which on Argon or others, and why; the Flash safety switch tally (Flash-built tasks reviewed, first-review failures) and whether it tripped, and which tasks were re-routed to Argon because of it; any drained-pool question and the user's answer (wait or Module 3 mode), and which tasks ran on that route; cap changes, worktree use, open items, minor choices made.
+One summary, always required, even when every task went to a single sub-agent: what was built; the tasks routed as `opus-sensitive`, with their reasons; a per-wave table; fixes sent and their outcome by step, with every Claude-plan fix called out; which tasks were built on Flash high (with their mini-tasks) and which on Argon or others, and why; the Flash safety switch tally (Flash-built tasks reviewed, first-review failures) and whether it tripped, and which tasks were re-routed to Argon because of it; any drained-pool question and the user's answer (wait or Module 3 mode), and which tasks ran on that route; cap changes, worktree use, open items, minor choices made.
 
 | wave | task | route (Flash / Argon or other agy / Module 3) | model requested | model that ran | fallbacks | reviewer (changed lines) | fix steps | result after review |
 |---|---|---|---|---|---|---|---|---|
 
 ## If everything fails
-Only when `agy` itself is broken, or the Claude plan is out of quota, or Flash or the agy pools are drained and the user has not answered: stop and tell the user. Do not do the bulk work yourself.
+Only when `agy` itself is broken, or the Claude plan is out of quota, or Flash or the agy pools are drained and the user has not answered: stop and tell the user. Do not do any of the work yourself, not even a small part: the main session never implements.
