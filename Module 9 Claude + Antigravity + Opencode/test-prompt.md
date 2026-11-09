@@ -60,8 +60,8 @@ Print: files created, whether the self-check passed, issues found and fixed, and
 - A plan table is printed first, before any file is touched, with a route and a score for every task (sensitive ones labeled `opus-sensitive (reason)`). Quota checks (`opencode-run.sh --status`, agy markers) ran before it.
 - The main chat edits no project files and runs no builds. It only launches builders and reads short reports.
 - The design shell went to `claude-sonnet-builder` or `claude-opus-builder`, never to agy or OpenCode.
-- Tasks that split appear as Flash-high mini-tasks (`-m1`, `-m2`...). Scouting went to OpenCode `scout` (Flash scout only if that chain was drained). Argon appears only for a hard task or a fix.
-- Every task that edits files got ONE review: `sonnet-reviewer` at 400 changed lines or fewer, `opus-reviewer` above. No agy or OpenCode model reviewed anything.
+- Tasks that split appear as Flash-high mini-tasks (`-m1`, `-m2`...). The self-check (links, accessibility, leftover text) is a scout row in the plan and ran on OpenCode `scout` (Flash scout only if that chain was drained), not in the main chat. Argon appears only for a hard task or a fix.
+- Every task that edits files got ONE review: `sonnet-reviewer` at 800 changed lines or fewer, `opus-reviewer` above (or for hard/sensitive work). No agy or OpenCode model reviewed anything.
 - A failed review followed the ladder for whoever built it (Flash: OpenCode `hard`, Argon medium, agy Sonnet, agy Opus; OpenCode: same model, Argon medium, agy Sonnet, agy Opus). A drained agy Sonnet or Opus step was replaced by the Claude agent of the same tier.
 - The final table has one row per task with the pool, the model that ran, any re-route, the reviewer and the result; `TASKS.md` got one line per task; the "Elapsed" line printed.
 
