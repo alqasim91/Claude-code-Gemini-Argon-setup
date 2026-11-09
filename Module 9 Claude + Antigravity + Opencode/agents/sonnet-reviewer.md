@@ -1,6 +1,6 @@
 ---
 name: sonnet-reviewer
-description: Reviews ONE task's diff against its acceptance criteria, on the Claude plan. Read-only. Returns PASS or FAIL with a numbered defect list. Used for every task whose changed lines (combined, for a task split into mini-tasks) are 400 or fewer.
+description: Reviews ONE task's diff against its acceptance criteria, on the Claude plan. Read-only. Returns PASS or FAIL with a numbered defect list. Used for every task whose changed lines (combined, for a task split into mini-tasks) are 800 or fewer (never for hard-routed or sensitive tasks, which go to opus-reviewer).
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

@@ -7,7 +7,7 @@ Claude Opus is the boss. It splits your request into phases and tasks and sends 
 - **Your Claude plan** does design, sensitive work, every review, and fix steps when agy Sonnet or Opus is drained.
 - **Module 3** (Claude only) is the last fallback, only when you say so.
 
-It combines Module 6 Flash builder and Module 8. Same rules as both: the main chat never implements, reviews by diff size (400 lines), "Phases", no decision boxes except one question when pools are drained.
+It combines Module 6 Flash builder and Module 8. Same rules as both: the main chat never implements, reviews by diff size (800 lines), "Phases", no decision boxes except one question when pools are drained.
 
 # Part 1: Setup
 
@@ -128,8 +128,9 @@ Flash, Argon, agy Sonnet, agy Opus and each OpenCode model have their own marker
 ## Who reviews and fixes
 | Diff size | Reviewer |
 |---|---|
-| 400 changed lines or fewer | `sonnet-reviewer` |
-| more than 400 | `opus-reviewer` sub-agent |
+| 800 changed lines or fewer | `sonnet-reviewer` |
+| more than 800 | `opus-reviewer` sub-agent |
+| any size, hard-routed (Argon, OpenCode `hard`) or sensitive | `opus-reviewer` |
 
 One review per task (after all its mini-tasks). No agy or OpenCode model reviews, because a reviewer must not edit.
 
@@ -147,12 +148,13 @@ A drained agy Sonnet or Opus step is replaced by Claude Sonnet or Opus of the sa
 Opus tallies first-review failures per pool (Flash, OpenCode). From the 3rd reviewed task, more than 1 in 3 failing trips that pool for the rest of the run. Flash tripped: its work goes to OpenCode. OpenCode tripped: splittable work goes to Flash, the rest to Argon medium. Both tripped: Argon medium, then the question below.
 
 ## When pools are drained
-Fallbacks between pools are silent. A task is held only when every pool that may take it is drained. Opus then asks once: "Free pools are drained for <tasks>. Wait for the reset, or switch the held tasks to Module 3?" Nothing runs on Claude for build work until you answer. Module 3 mode is Claude only: scout, Haiku, Sonnet, Opus by the same scores, 400-line review rule.
+Fallbacks between pools are silent. A task is held only when every pool that may take it is drained. Opus then asks once: "Free pools are drained for <tasks>. Wait for the reset, or switch the held tasks to Module 3?" Nothing runs on Claude for build work until you answer. Module 3 mode is Claude only: scout, Haiku, Sonnet, Opus by the same scores, 800-line review rule.
 
 # Part 3: Good to know
 - **Relay cost:** Flash and Argon run through a Sonnet relay sub-agent (`agy-delegate`), which uses a little of your Claude plan per task. OpenCode runs straight from a script, with no relay. That is why scouting goes to OpenCode first.
 - **agy Sonnet and Opus are fix-only.** They never build first, review or design, so their small pools are spent only when a review failed.
 - **A non-hard task that cannot be specced is held when OpenCode `build` is drained**, rather than spending Argon. Edit Routing 7 in `CLAUDE.md` if you prefer Argon there.
+- **agy runs have no shell.** Headless `agy` (`--mode accept-edits`) edits files but denies shell commands, so Flash, Argon, agy Sonnet and Opus can't run tests. The reviewer runs the safe, read-only checks.
 - **Free models can say "done" and change nothing.** The script prints `changed lines (owned)`; 0 on a build task is a failure.
 - **Edit the tables.** Routing, chains and caps live in `CLAUDE.md`; OpenCode chains also live in `chain_for` at the top of the script. Keep both in step.
 - **Review every diff.** File ownership is enforced by instructions, not by the filesystem.
