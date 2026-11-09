@@ -4,7 +4,7 @@ Claude Opus is the boss. It splits your request into phases and tasks and sends 
 - **Antigravity Flash** builds every task that splits into small, exact pieces. Flash has its own quota, so it never touches your Argon weekly limit.
 - **OpenCode free models** take the same pieces when Flash runs dry, plus scouting, image/audio/large-context work, and tasks that are not hard but cannot be specced exactly.
 - **Argon** (Antigravity) only takes hard tasks, and fix rounds. **agy Sonnet and agy Opus** take fix rounds only.
-- **Your Claude plan** does design, sensitive work, every review and the late fix steps.
+- **Your Claude plan** does design, sensitive work, every review, and fix steps when agy Sonnet or Opus is drained.
 - **Module 3** (Claude only) is the last fallback, only when you say so.
 
 It combines Module 6 Flash builder and Module 8. Same rules as both: the main chat never implements, reviews by diff size (400 lines), "Phases", no decision boxes except one question when pools are drained.
