@@ -62,7 +62,7 @@ Print: files created, whether the self-check passed, issues found and fixed, and
 - The design shell went to `claude-sonnet-builder` or `claude-opus-builder`, never to agy or OpenCode.
 - Tasks that split appear as Flash-high mini-tasks (`-m1`, `-m2`...). Scouting went to OpenCode `scout` (Flash scout only if that chain was drained). Argon appears only for a hard task or a fix.
 - Every task that edits files got ONE review: `sonnet-reviewer` at 400 changed lines or fewer, `opus-reviewer` above. No agy or OpenCode model reviewed anything.
-- A failed review followed the ladder for whoever built it (Flash: Argon medium, Sonnet medium, Opus medium; OpenCode: same model, Argon medium, Sonnet high, Opus medium).
+- A failed review followed the ladder for whoever built it (Flash: OpenCode `hard`, Argon medium, agy Sonnet, agy Opus; OpenCode: same model, Argon medium, agy Sonnet, agy Opus). A drained agy Sonnet or Opus step was replaced by the Claude agent of the same tier.
 - The final table has one row per task with the pool, the model that ran, any re-route, the reviewer and the result; `TASKS.md` got one line per task; the "Elapsed" line printed.
 
 ## Optional: test the silent fallbacks
@@ -71,6 +71,6 @@ Run these in the project folder (Mac, or Git Bash on Windows), then paste Prompt
 
 1. **Flash drained.** `mkdir -p .claude/agy-quota && date -u +%Y-%m-%dT%H:%M:%SZ > .claude/agy-quota/gemini-3.8-flash-high`. Expect: the plan shows the mini-tasks on OpenCode `build` with a "Flash drained; silent re-route" line, and no question to you.
 2. **OpenCode build drained.** `mkdir -p .claude/opencode-quota && for m in deepseek-v4.1-flash-free glm-5.3-flash-free flint-40b-free beam-free big-pickle pulse-alpha-free crouton-alpha-free; do printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > ".claude/opencode-quota/$m"; done`. Expect: splittable work stays on Flash; any non-splittable task is held.
-3. **Everything drained.** Do both 1 and 2, plus `for m in gemini-4-argon-medium gemini-4-argon-high; do date -u +%Y-%m-%dT%H:%M:%SZ > ".claude/agy-quota/$m"; done`. Expect: design and sensitive work still run on Claude, and Opus asks ONE question: wait for the reset, or switch to Module 3? It must not choose for you.
+3. **Everything drained.** Do both 1 and 2, plus `for m in gemini-4-argon-medium gemini-4-argon-high claude-sonnet-5-5-medium claude-opus-5-5-medium; do date -u +%Y-%m-%dT%H:%M:%SZ > ".claude/agy-quota/$m"; done`. Expect: design and sensitive work still run on Claude, and Opus asks ONE question: wait for the reset, or switch to Module 3? It must not choose for you.
 
 Clear the markers when you are done: `rm .claude/agy-quota/* .claude/opencode-quota/*`.

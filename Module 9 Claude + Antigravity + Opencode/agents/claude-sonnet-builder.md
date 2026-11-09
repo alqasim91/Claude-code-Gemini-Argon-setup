@@ -1,6 +1,6 @@
 ---
 name: claude-sonnet-builder
-description: Builder and fixer on the Claude plan (Sonnet, effort high). Builds design shells and first design drafts, applies fix steps for work built by Argon, by OpenCode models (round 3, or round 2 for the hard, large, vision and av roles), and in Module 3 mode builds most tasks. Never fixes Flash-built work (that is claude-sonnet-fixer). Never a relay.
+description: Builder and fixer on the Claude plan (Sonnet, effort high). Builds design shells and first design drafts, stands in for a drained agy Sonnet fix step (Argon- and OpenCode-built work), fixes large/vision/av work, and in Module 3 mode builds most tasks. Flash-built work goes to claude-sonnet-fixer instead. Never a relay.
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 effort: high
