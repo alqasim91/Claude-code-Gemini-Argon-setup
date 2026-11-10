@@ -7,11 +7,15 @@ Claude Opus is the boss. It splits your request into phases and tasks and sends 
 - **Your Claude plan** does design, sensitive work, every review, and fix steps when agy Sonnet or Opus is drained.
 - **Module 3** (Claude only) is the last fallback, only when you say so.
 
+Flash, Argon, agy Sonnet and agy Opus run through `scripts/agy-run.sh`, straight from a script, with no helper agent in between. OpenCode runs the same way through `scripts/opencode-run.sh`. So launching an outside model costs no Claude usage.
+
 It combines Module 6 Flash builder and Module 8. Same rules as both: the main chat never implements, reviews by diff size (800 lines), "Phases", no decision boxes except one question when pools are drained.
 
 # Part 1: Setup
 
-Each step shows **Mac** (Terminal) and **Windows** (PowerShell). `opencode-run.sh` is a bash script: on Windows run Claude Code from Git Bash or WSL.
+Each step shows **Mac** (Terminal) and **Windows** (PowerShell).
+
+**Windows note:** the two runner scripts are bash scripts. Claude Code on Windows needs Git for Windows and runs its commands through Git Bash, so this normally works. If the scripts do not start, run Claude Code from Git Bash or WSL.
 
 ## Step 1. Your plans
 - **Google AI Pro** for `agy` (Flash and Argon).
@@ -42,58 +46,83 @@ opencode --version
 npm i -g opencode-ai
 opencode --version
 ```
-Then `opencode models opencode`. The free ones end in `-free` (plus `big-pickle`). Built for these ten, checked 2026-11-04: `beam-free`, `big-pickle`, `crouton-alpha-free`, `deepseek-v4.1-flash-free`, `flint-40b-free`, `glm-5.3-flash-free`, `mimo-v2.6-flash-free`, `nemotron-3.5-lightning-free`, `nemotron-3.5-super-vl-free`, `pulse-alpha-free`. A model that disappeared makes its chain step fail: edit `chain_for` in the script and the chain table in `CLAUDE.md` together. The script uses `-m`, `--variant`, `--dir`, `--agent` and never `--auto`. Check that a read-only `plan` agent exists with `opencode agent list`; if not, edit `AGENT_READONLY` at the top of the script.
+Then `opencode models opencode`. The free ones end in `-free` (plus `big-pickle`). Built for these ten, checked 2026-11-04: `beam-free`, `big-pickle`, `crouton-alpha-free`, `deepseek-v4.1-flash-free`, `flint-40b-free`, `glm-5.3-flash-free`, `mimo-v2.6-flash-free`, `nemotron-3.5-lightning-free`, `nemotron-3.5-super-vl-free`, `pulse-alpha-free`. You do not need to keep this list up to date: the script asks OpenCode which free models exist at run time. The script uses `-m`, `--variant`, `--dir`, `--agent` and never `--auto`. Check that a read-only `plan` agent exists with `opencode agent list`; if not, edit `AGENT_READONLY` at the top of the script.
 
-## Step 4. Copy the files into your project
-Unzip `module-9-files.zip` **inside your project folder** (it creates a `module-9` folder), then open a terminal in the project folder.
-
-You are copying: `CLAUDE.md` and `AGENTS.md` to the project root; 8 agent files to `.claude/agents/`; `scripts/opencode-run.sh` to `scripts/` (executable); two new quota folders, hidden from git.
+## Step 4. Install the files (one command)
+Unzip `module-9-files.zip` **inside your project folder** (it creates a `module-9` folder). Open a terminal in the project folder. Run one command.
 
 **Mac**
 ```bash
-mkdir -p .claude/agents .claude/agy-quota .claude/opencode-quota scripts
-cp module-9/CLAUDE.md module-9/AGENTS.md .
-cp module-9/agents/*.md .claude/agents/
-cp module-9/scripts/opencode-run.sh scripts/
-chmod +x scripts/opencode-run.sh
-printf '.claude/agy-quota/\n.claude/opencode-quota/\n' >> .gitignore
-```
-Files already in the project root (`CLAUDE.md`, `AGENTS.md`, `agents/`, `scripts/` side by side, no `module-9` folder)?
-```bash
-mkdir -p .claude/agents .claude/agy-quota .claude/opencode-quota
-mv agents/*.md .claude/agents/ && rmdir agents
-chmod +x scripts/opencode-run.sh
-printf '.claude/agy-quota/\n.claude/opencode-quota/\n' >> .gitignore
+bash module-9/install.sh
 ```
 **Windows (PowerShell)**
 ```powershell
-New-Item -ItemType Directory -Force .claude\agents, .claude\agy-quota, .claude\opencode-quota, scripts | Out-Null
+powershell -ExecutionPolicy Bypass -File module-9\install.ps1
+```
+It prints one line per step. Running it again is safe: it changes nothing the second time.
+
+**What it does**
+- Copies the 7 agents to `.claude/agents/` and the rule files to `.claude/m9/`.
+- Copies `scripts/agy-run.sh` and `scripts/opencode-run.sh` and makes them runnable.
+- Copies `CLAUDE.md` and `AGENTS.md`. If you already have your own, it does not overwrite them: it saves the new text as `CLAUDE.module-9.md` and tells you to paste it in. An older Module 9 copy is backed up and replaced.
+- Adds the approvals list to `.claude/settings.json` (merged, your other settings stay).
+- Adds three lines to `.gitignore`.
+- Starts git and makes a first commit if the folder has none. It never touches your `.env` files.
+- Checks that `agy` and `opencode` are installed and tells you how to get them if not.
+
+Both `agy` and `opencode` read `AGENTS.md`, which is how the other models get the rules.
+
+<details>
+<summary>Manual install (only if you prefer to copy by hand)</summary>
+
+**Mac**
+```bash
+mkdir -p .claude/agents .claude/m9 .claude/agy-quota .claude/opencode-quota scripts
+cp module-9/CLAUDE.md module-9/AGENTS.md .
+cp module-9/agents/*.md .claude/agents/
+cp module-9/rules/*.md .claude/m9/
+cp module-9/scripts/agy-run.sh module-9/scripts/opencode-run.sh scripts/
+chmod +x scripts/agy-run.sh scripts/opencode-run.sh
+cp module-9/settings.json .claude/settings.json
+printf '.claude/agy-quota/\n.claude/opencode-quota/\n.m9/\n' >> .gitignore
+git init && git add -A && git commit -m "start"
+```
+**Windows (PowerShell)**
+```powershell
+New-Item -ItemType Directory -Force .claude\agents, .claude\m9, .claude\agy-quota, .claude\opencode-quota, scripts | Out-Null
 Copy-Item module-9\CLAUDE.md, module-9\AGENTS.md .
 Copy-Item module-9\agents\*.md .claude\agents\
-Copy-Item module-9\scripts\opencode-run.sh scripts\
-Add-Content .gitignore ".claude/agy-quota/"
-Add-Content .gitignore ".claude/opencode-quota/"
+Copy-Item module-9\rules\*.md .claude\m9\
+Copy-Item module-9\scripts\agy-run.sh, module-9\scripts\opencode-run.sh scripts\
+Copy-Item module-9\settings.json .claude\settings.json
+Add-Content .gitignore ".claude/agy-quota/", ".claude/opencode-quota/", ".m9/"
 ```
-Already have a `CLAUDE.md` or `AGENTS.md`? Do not overwrite it: paste the new text into your existing file. Both `agy` and `opencode` read `AGENTS.md`, which is how the free models get the rules.
+Already have a `CLAUDE.md`, `AGENTS.md` or `.claude/settings.json`? Do not overwrite them: paste the new text into your file. Not using git yet? The review step reads `git diff`, so run `git init && git add -A && git commit -m "start"` once.
+</details>
 
-**Check it worked:** `ls -la .claude/agents scripts`. You should see 8 agent files (`agy-delegate`, `claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer`, `claude-haiku-builder`, `scout`, `sonnet-reviewer`, `opus-reviewer`) and an executable `opencode-run.sh`.
+**Check it worked:** `ls -la .claude/agents .claude/m9 scripts`. You should see:
+- 7 agents: `claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer`, `claude-haiku-builder`, `scout`, `sonnet-reviewer`, `opus-reviewer`.
+- 5 files in `.claude/m9/`.
+- Two executable scripts: `agy-run.sh` and `opencode-run.sh`.
 
-## Step 5. Make sure the folder is a git repo
-The review step reads `git diff`. Skip if you already use git: `git init && git add -A && git commit -m "start"`.
-
-## Step 6. Start Claude Code and smoke-test
+## Step 5. Start Claude Code and smoke-test
 ```
 claude
 ```
-`/agents` should list the 8 agents. Then check one model in each tool:
+`/agents` should list the 7 agents. Choose Opus. Then check one model in each tool:
 ```
 agy -p "Reply with the word ok" --model gemini-3.8-flash-high
 opencode run -m opencode/deepseek-v4.1-flash-free --variant high "Reply with the word ok"
 ```
+Then check the scripts can see their quota markers:
+```
+scripts/agy-run.sh --status
+scripts/opencode-run.sh --status --role build
+```
 Then run a prompt from `module-9/test-prompt.md`.
 
-## If Claude Code blocks the script
-Optional allow rule in `.claude/settings.json`: `{"permissions":{"allow":["Bash(scripts/opencode-run.sh:*)"]}}`. Never add `--auto` or `--dangerously-skip-permissions`.
+## Approvals
+The installer adds an allow-list to `.claude/settings.json`: the two runner scripts, read-only git commands and the `.m9/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. Never add `--auto` or `--dangerously-skip-permissions`.
 
 # Part 2: How it works
 
@@ -112,9 +141,14 @@ Optional allow rule in `.claude/settings.json`: `{"permissions":{"allow":["Bash(
 
 ## Quota is separate per pool
 Flash, Argon, agy Sonnet, agy Opus and each OpenCode model have their own markers (`.claude/agy-quota/`, `.claude/opencode-quota/`). Flash use does not touch Argon. Argon is kept for hard tasks and fixes so the weekly limit lasts.
-- Check any time: `scripts/opencode-run.sh --status --role build`, and `find .claude/agy-quota -type f -mmin -360`.
+- Check any time: `scripts/agy-run.sh --status` and `scripts/opencode-run.sh --status --role build`.
 - Delete a marker file to clear it by hand.
-- agy reset times are unpublished: a marker under 6 hours old counts as drained (a guess).
+- An agy marker holds a reset time. If the tool gives none, the script uses 6 hours from now (a guess).
+
+## OpenCode models
+The script asks OpenCode which free models exist right now. It skips ones that were removed and tries brand-new free ones last (never for private code). You no longer edit the model list by hand when a model disappears. The preferred order lives in `chain_for` at the top of the script, for people who want to change it.
+
+A free model that hangs for 30 minutes is skipped and the next one is tried. Two hangs in a row stop the task.
 
 ## Caps (parallel tasks, all guesses)
 4 total. Flash 3, OpenCode 3 (`hard` or `large` 1), Argon 1, agy Sonnet 1, agy Opus 1. Claude sub-agents count toward the total only. Opus lowers a cap when it sees a concurrency error or a shared free limit.
@@ -151,11 +185,14 @@ Opus tallies first-review failures per pool (Flash, OpenCode). From the 3rd revi
 Fallbacks between pools are silent. A task is held only when every pool that may take it is drained. Opus then asks once: "Free pools are drained for <tasks>. Wait for the reset, or switch the held tasks to Module 3?" Nothing runs on Claude for build work until you answer. Module 3 mode is Claude only: scout, Haiku, Sonnet, Opus by the same scores, 800-line review rule.
 
 # Part 3: Good to know
-- **Relay cost:** Flash and Argon run through a Sonnet relay sub-agent (`agy-delegate`), which uses a little of your Claude plan per task. OpenCode runs straight from a script, with no relay. That is why scouting goes to OpenCode first.
+- **No relay.** All outside models are launched by scripts. The main chat only reads their short reports.
+- **Run folder.** `.m9/` holds briefs, logs, the shared contract (`contract.md`), the task log (`TASKS.md`) and the detailed table of the last run (`last-run.md`). It is git-ignored and safe to delete between runs.
+- **The final message is short.** A few plain lines. Details are in `.m9/last-run.md`.
+- **Rule files.** Rarely needed rules live in `.claude/m9/`. Opus reads them only when needed, which keeps every message cheaper.
 - **agy Sonnet and Opus are fix-only.** They never build first, review or design, so their small pools are spent only when a review failed.
 - **A non-hard task that cannot be specced is held when OpenCode `build` is drained**, rather than spending Argon. Edit Routing 7 in `CLAUDE.md` if you prefer Argon there.
 - **agy runs have no shell.** Headless `agy` (`--mode accept-edits`) edits files but denies shell commands, so Flash, Argon, agy Sonnet and Opus can't run tests. The reviewer runs the safe, read-only checks.
 - **Free models can say "done" and change nothing.** The script prints `changed lines (owned)`; 0 on a build task is a failure.
-- **Edit the tables.** Routing, chains and caps live in `CLAUDE.md`; OpenCode chains also live in `chain_for` at the top of the script. Keep both in step.
+- **Edit the tables.** Routing and caps live in `CLAUDE.md`. The preferred order of the free models lives in `chain_for` at the top of `scripts/opencode-run.sh`.
 - **Review every diff.** File ownership is enforced by instructions, not by the filesystem.
-- **Known unknowns:** exact quota wording and reset times of both tools; whether `opencode run` exits non-zero on a limit; whether `--agent plan` is read-only; concurrency caps; free-model benchmarks are vendor-reported. Module 9 has not been run on the real CLIs yet; the OpenCode script was tested only against a stub.
+- **Known unknowns:** there has been one real run so far (a landing-site test, all tasks passed, only Flash and Claude Sonnet took part). The OpenCode route, Argon, the fix ladders and the drained-pool paths have not been run on the real tools. The scripts were tested against stand-in tools. Exact quota wording and reset times, whether `opencode run` exits non-zero on a limit, whether `--agent plan` is read-only, concurrency caps, and free-model benchmarks (vendor-reported) are also unconfirmed.

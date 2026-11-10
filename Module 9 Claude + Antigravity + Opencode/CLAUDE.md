@@ -1,117 +1,60 @@
 @AGENTS.md
 
-# Orchestration (Module 9: Claude plans in phases; Antigravity Flash and OpenCode free models build the volume, Argon takes the hard tasks, the Claude plan designs, reviews and fixes)
+# Orchestration (Module 9: Claude plans in phases; Flash and OpenCode free models build the volume, Argon takes hard tasks, the Claude plan designs, reviews and fixes)
 
 ## Hard rule: the main session never implements
-Claude (Opus, this session) is the planner and the judge, never the builder. The main chat's context must stay short and clean, so **even work that needs Opus itself runs in a sub-agent** (`claude-opus-builder`).
-- The main session NEVER edits, writes, moves or deletes project files, and never runs builds, installs, tests, migrations, formatters or codemods. No exceptions: not for small jobs, not for sensitive work, not to finish what a sub-agent left half done.
-- Its jobs: plan, launch builders, read their short reports and `git diff --stat` / `--numstat` (never a full diff), decide pass or fail from the reviewers' verdicts, and write the final summary.
-- It may run read-only commands only: `git status`, `git diff --stat` / `--numstat`, `ls`, reading CLAUDE.md, checking quota markers. Housekeeping this module defines is allowed: `scripts/opencode-run.sh` (launching a task and `--status`), brief files in `/tmp`, deleting a quota marker to clear a model, the `.gitignore` lines for the two quota folders, appending one line per task to `TASKS.md`, and the git steps of Worktree mode (add, merge, remove).
-- If a task seems to need the main session to touch a project file, it is a sub-agent task: route it.
+Claude (Opus, this session) plans and judges, never builds. Even work that needs Opus runs in a sub-agent (`claude-opus-builder`). No exceptions (small jobs, sensitive work, finishing a builder's half-done task): route it.
+- NEVER edit, write, move or delete project files; never run builds, installs, tests, migrations, formatters or codemods.
+- Jobs: plan, launch builders, read short reports and `git diff --stat|--numstat` (never a full diff), judge from reviewers' verdicts, write the summary.
+- Allowed: read-only `git status`, `git diff --stat|--numstat`, `ls`, reading CLAUDE.md and rule files. Housekeeping: running `scripts/agy-run.sh` and `scripts/opencode-run.sh` (launch and `--status`), writing files under `.m9/` (briefs, `contract.md`, `TASKS.md`, `last-run.md`), deleting a quota marker, the git steps of Worktree mode.
+
+## Rule files (installed at `.claude/m9/`, read-only; a fired trigger is mandatory)
+
+| File | Read it when |
+|---|---|
+| `.claude/m9/fix-ladders.md` | Before launching the first fix step of a run (any review returned FAIL) |
+| `.claude/m9/drained-pools.md` | As soon as any task is held, or the user mentions Module 3 |
+| `.claude/m9/safety-switches.md` | After the 3rd reviewed task of a pool, if that pool has any first-review failure |
+| `.claude/m9/worktree.md` | Only when file sets cannot be disjoint |
+| `.claude/m9/models.md` | Only when choosing `--start`, judging a data-policy question beyond the Data rule, or editing chains |
+
+After a context reset, compaction or resume: re-read this file, then every rule file whose trigger already fired in this run. Re-print the remaining plan (one row per task: done and accepted, running, waiting, failed) from the plan you hold, `git status`, `git diff --stat`, both `--status` outputs and the builders' reports. Continue by delegating; a half-done task goes to a builder with "A previous run was cut off; inspect the owned files first, then finish the task."
+
+Guards that hold even if a file is not read:
+- Module 3 never without the user's answer to the drained-pools question.
+- No agy or OpenCode model reviews. Flash never fixes. S = 2 never goes to a free model.
+- `--private` on every OpenCode task for S = 1 or a private repo.
+- Safety switch: tally first-review failures per pool; from the 3rd reviewed task, more than 1 in 3 failing trips the pool; then read `safety-switches.md`.
 
 ## Who does what
-Two build pools, a scarce hard-task pool, and two fix-only pools. All have their own quota markers, so one pool running dry never touches the others.
 
-| Pool | How it runs | Takes | Quota |
-|---|---|---|---|
-| **Antigravity Flash** (`gemini-3.8-flash-high`) | `agy-delegate` relay subagent | **First choice for every build task Opus can split into exact mini-tasks.** Also Flash scouting | Own marker, nearly unlimited. Separate from Argon: Flash use never touches the Argon weekly limit |
-| **OpenCode free models** (10 models, role chains) | Opus runs `scripts/opencode-run.sh` in the background, no relay | **Second choice for mini-tasks (silent fallback when Flash is drained).** First choice for scouting, image/audio/large-context input, and non-splittable tasks that are not hard | One marker per model; the script walks the chain itself |
-| **Antigravity Argon** (`gemini-4-argon-medium`) | `agy-delegate` relay subagent | **Hard tasks only**, and fix steps (see Fix ladders). Never design | Small pool, weekly |
-| **Antigravity Sonnet / Opus** (`claude-sonnet-5-5-medium`, `claude-opus-5-5-medium`) | `agy-delegate` relay subagent | **Fix rounds only** (the middle and late steps of the ladders). Never build first, never review, never design | Own markers per model, small pools: spent only when a review failed |
-| **Claude plan** (sub-agents) | Agent tool | Design, sensitive work, tiny edits, all reviews, stand-in fix steps when agy Sonnet or Opus is drained, Module 3 mode | Your Claude Pro limit |
+| Pool | Runs as | Takes |
+|---|---|---|
+| **Flash** (`gemini-3.8-flash-high`) | `scripts/agy-run.sh --model flash-high` | **First choice for every build task Opus can split into exact mini-tasks**, and Flash scouting |
+| **OpenCode free models** (role chains) | `scripts/opencode-run.sh` | **Second choice for mini-tasks (silent fallback when Flash is drained).** First choice for scouting, image/audio/large input, non-splittable tasks that are not hard |
+| **Argon** (`gemini-4-argon-medium`) | `agy-run.sh --model argon` | **Hard tasks only**, and fix steps. Never design |
+| **agy Sonnet / Opus** (`claude-sonnet-5-5-medium`, `claude-opus-5-5-medium`) | `agy-run.sh --model sonnet` / `opus` | **Fix rounds only.** Never build first, review or design |
+| **Claude plan** | Agent tool: `claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer`, `claude-haiku-builder`, `scout`, `sonnet-reviewer`, `opus-reviewer` | Design, sensitive work, tiny edits, all reviews, stand-in fix steps, Module 3 mode |
 
-- **Design builds** (shells, first design drafts) go to `claude-sonnet-builder` or `claude-opus-builder`. Never to agy or OpenCode.
-- **Sensitive work** (by layer, Routing 2) goes to `claude-opus-builder`, never to any free model. **Tiny edits** go to `claude-haiku-builder`.
-- **Reviews** run on the Claude plan, ONCE per task: `sonnet-reviewer` for 800 or fewer changed lines, the `opus-reviewer` sub-agent above 800, and always for hard-routed and `opus-sensitive` tasks. Every task that edits files gets a reviewer. The main session never reads a full diff. No agy or OpenCode model ever reviews.
-- **Fixes** follow the Fix ladders: OpenCode first for Flash-built work, then Argon, then agy Sonnet, then agy Opus. A drained agy step is replaced by the Claude agent of the same tier. Flash never fixes and never reviews. Reviewers must not edit, which is why no agy model reviews.
-- **Fallbacks between pools are silent** (Flash <-> OpenCode, Argon -> OpenCode `hard`): Opus re-routes, prints one plan line, and does not ask. Only the drained-pools question (below) is ever asked.
-- **Safety switches** pull an unreliable pool out of the run (see Safety switches).
-- **Module 3** is the last fallback, only after the user says so. Opus never switches to it on its own.
+Each pool has its own quota markers. Design builds -> `claude-sonnet-builder` (default) or `claude-opus-builder`; sensitive work -> `claude-opus-builder`; tiny edits -> `claude-haiku-builder`; `scout` is Module 3 mode only. Reviews: ONCE per task (see Review). Fixes: `.claude/m9/fix-ladders.md`. Fallbacks between pools (Flash <-> OpenCode, Argon -> OpenCode `hard`) are silent: re-route, print one plan line, do not ask. Module 3 is the last fallback, only after the user says so. Independent tasks run in parallel, in phases, on disjoint files.
 
-Independent tasks run in parallel, in phases, on disjoint files.
+OpenCode roles: `scout`, `mech`, `build`, `hard`, `large` (input over about 150k tokens), `vision`, `av`; the script owns chains and fallback (`models.md`). `--private` keeps only the zero-retention models. agy aliases (`--model`): `flash-high` (builds), `flash` / `flash-low` (read-only scouting, `--owns none`), `argon` / `argon-high` / `argon-low`, `sonnet` / `opus` (fix tasks only).
 
 ## Autonomy (no decision boxes)
-Run end to end without asking the user. Never use AskUserQuestion or offer choice boxes. The task plan is announced, not submitted for approval.
-- Found a defect in a diff or test? Send it back in the same turn, as a new delegation listing each defect, following the Fix ladders. Do not ask first.
-- Fix loop: up to 4 steps per task, following the ladder for whoever built it. If the last step still fails review, report the remaining defect in the final summary and continue. Fix steps of different tasks are independent: launch them together.
-- Unclear spec or minor choice: pick the most reasonable option, note it in the final summary, keep going. An ambiguous spec or an architecture decision is decided by Opus in the plan (reasoning only, no editing); the decision goes into the briefs and the work is delegated. Cosmetic or out-of-spec gaps are listed in the summary, not sent back, unless they break an acceptance criterion.
-- Stop and ask only for hard blockers: login failure, `agy` or `opencode` missing, a permission block, a Claude plan limit hit, or an action that deletes data or touches secrets (copying, linking or reading env files counts; stop and ask, even to make a worktree work). A suspected concurrency error is not a hard blocker (see Concurrency caps).
-- ONE exception to "no questions": the drained-pools question (see When pools are drained). No route changes to Claude build work (Module 3) without the user's answer.
-- Finish with one summary (see Final summary). It is always required, even when every task went to one builder.
+Run end to end. Never use AskUserQuestion or offer choice boxes. The plan is announced, not submitted for approval.
+- Defect found: send it back the same turn as a new delegation listing each defect (fix ladders). Up to 4 steps per task; if the last still fails, record it and continue.
+- Unclear spec or minor choice: pick the most reasonable option, note it in `.m9/last-run.md`. Ambiguous specs and architecture decisions are decided by Opus in the plan (reasoning only) and go into the briefs. Cosmetic or out-of-spec gaps are listed, not sent back, unless they break an acceptance criterion.
+- Stop and ask only for hard blockers: login failure, `agy` or `opencode` missing, a permission block, a Claude plan limit hit, or an action that deletes data or touches secrets (copying, linking or reading env files, even for a worktree). A suspected concurrency error is not one.
+- ONE exception: the drained-pools question (`drained-pools.md`). No Module 3 without the user's answer.
+- Always finish with the final summary.
 
-## After a context reset, compaction or resume
-First re-read this Orchestration section. Then re-print the remaining plan, one row per task with its status (done and accepted, running, waiting, failed), rebuilt from the plan you still hold, `git status`, `git diff --stat`, the two quota folders and the builders' reports. Then continue by delegating. Never continue inline, not even to "just finish" a half-done task: it goes to a builder with the note "A previous run was cut off; inspect the owned files first, then finish the task."
+## Secrets, databases, data rule
+- Env files (`.env`, `.env.local`...), keys, credentials: copying, linking or reading them means stop and ask. Binds the main session and every builder. Never put them in a brief.
+- A builder may test migrations on a local throwaway database (no real data or credentials). Nobody touches a real or shared database.
+- S = 0 and no personal data: any pool. S = 1 (near auth, PII, customer data, business-private code): OpenCode only with `--private`, or Flash or Argon; never an OpenCode chain without `--private`. S = 2 (auth, crypto, secrets, payments, PHI, tenancy): never a free model; `claude-opus-builder`.
+- Private code (a client's or employer's repo): `--private` on EVERY OpenCode task, scouting included. Flash and Argon (Google) are allowed. If the user does not want Gemini to see a client's code, they say so in the prompt and Opus keeps those tasks on OpenCode `--private` or Claude.
 
-## Secrets and databases
-- Env files (`.env`, `.env.local` and so on), keys and credentials are secrets. Copying, linking or reading them: stop and ask the user. Binds the main session and every builder.
-- A builder may test migrations on a local, throwaway database (for example a temporary local Postgres) with no real data and no real credentials. Nobody touches a real or shared database.
-- Never put secrets, keys or `.env` contents in a brief.
-
-## Data rule (what may go to which pool)
-- S = 0 and no personal data: any pool.
-- S = 1 (near auth, PII, customer data, business-private code): OpenCode only with `--private` (keeps the two zero-retention models), or Flash or Argon. Never an OpenCode chain without `--private`.
-- S = 2 (auth, crypto, secrets, payments, PHI, tenancy): never a free model. `claude-opus-builder`.
-- Private code (a client's or employer's repo): add `--private` to EVERY OpenCode task, including scouting. Flash and Argon (Google) are allowed, as in Module 6. If you do not want Gemini to see a client's code, say so in the prompt and Opus keeps those tasks on OpenCode `--private` or Claude.
-
-## Model pool (edit these tables to change behavior)
-IDs confirmed from `agy models` (2026-10-25) and `opencode models opencode --verbose` (2026-11-04).
-
-Antigravity models (through `agy-delegate`, on the Google AI Pro plan):
-
-| Alias | agy model ID | Use for | Quota notes |
-|---|---|---|---|
-| flash-high (build) | `gemini-3.8-flash-high` | **First-choice builder** for any non-design task Opus can split into small, exactly specced mini-tasks. Needs a real `owns:` list. Never fixes, never reviews | Own marker. Nearly unlimited |
-| flash (scout) | `gemini-3.8-flash-medium` (`-low` for pure lookups) | Scouting fallback when the OpenCode `scout` chain is drained. Read-only | Own marker |
-| argon | `gemini-4-argon-medium` (`-high` for the hardest, `-low` for trivial) | **Hard tasks only.** Fix steps (medium) | Small pool; weekly |
-
-| sonnet (fix only) | `claude-sonnet-5-5-medium` | Fix steps of the ladders only. Never a first build, review, scout or design | Small pool. Own marker |
-| opus (fix only) | `claude-opus-5-5-medium` | Last agy fix step only | Smallest pool. Own marker |
-
-agy Sonnet and agy Opus never build first and never review: a reviewer that can edit would change the work after the check.
-
-OpenCode free models (through `scripts/opencode-run.sh`, called as `opencode/<id>`; effort via `--variant`; all benchmarks vendor-reported, none matches Claude Sonnet on hard work):
-
-| Model ID | Context / out | Input | Efforts | Data policy | Use for |
-|---|---|---|---|---|---|
-| `deepseek-v4.1-flash-free` | 200k / 32k | text, image | low, high, max | zero retention, no training | Default OpenCode builder (high). Private code |
-| `glm-5.3-flash-free` | 200k / 32k | text, image, video | low, high, max | zero retention, no training | Second builder. Screenshots. Private code |
-| `beam-free` | 1M / 131k | text | low to max | not trained on, kept 30 days | Hard or large-context builds. Unavailable in some countries |
-| `big-pickle` | 200k / 32k | text | none | trains on data | Late fallback. Unknown model, no published specs |
-| `flint-40b-free` | 262k / 65k | text | low to max | trains on data, kept 30 days | Fast scoped edits, tests, boilerplate |
-| `nemotron-3.5-lightning-free` | 262k / 262k | text | none | logged by NVIDIA | Scouting, formatting. Not a reasoning model |
-| `nemotron-3.5-super-vl-free` | 1M / 131k | text, image | none to xhigh | logged by NVIDIA | Image reading, big-context fallback |
-| `mimo-v2.6-flash-free` | 200k / 32k | text, image, audio, video | none | trains on data | Audio or video input only |
-| `pulse-alpha-free` | 1M / 131k | text, image | low, high, max | trains on data | Alpha test model. Experimental tail |
-| `crouton-alpha-free` | 1M / 270k | text, image, video, pdf | minimal to max | unknown | Alpha test model. Experimental tail |
-
-Claude-plan agents (in `.claude/agents/`, on the Claude Pro plan, never relays):
-
-| Agent | Model | Use for |
-|---|---|---|
-| `claude-sonnet-builder` | sonnet, effort high | Design shells and first design drafts. Stands in for a drained agy Sonnet fix step (non-Flash rows), and fixes large/vision/av work. Module 3 mode: design, docs, and everything not easy or Opus-trigger |
-| `claude-opus-builder` | opus, effort medium | **Sensitive work** (Routing 2) and the most important or complex designs. Stands in for a drained agy Opus fix step, and the last step for large/vision/av work. Module 3 mode: Opus-trigger tasks |
-| `claude-sonnet-fixer` | sonnet, effort medium | Stands in for a drained agy Sonnet fix step on Flash-built work. Fixes only |
-| `claude-haiku-builder` | haiku | Tiny, exactly described edits (Routing 3). Module 3 mode: easy, tool-verifiable tasks |
-| `scout` | haiku | Module 3 mode only: all read-only work, with file:line or URL evidence. Never edits |
-| `sonnet-reviewer` | sonnet | Reviews ONE task's diff of 800 changed lines or fewer, read-only. Never used for hard-routed or `opus-sensitive` tasks. Returns PASS or FAIL |
-| `opus-reviewer` | opus, effort medium | Reviews ONE task's diff of more than 800 changed lines, and every hard-routed (Argon, OpenCode `hard`) and `opus-sensitive` task, read-only. Returns PASS or FAIL with a numbered defect list |
-
-## OpenCode roles and chains (the script owns the fallback; edit `chain_for` in the script and this table together)
-A role is a chain of models in fallback order. `:x` is the variant.
-
-| Role | Chain |
-|---|---|
-| `scout` | nemotron-3.5-lightning-free, flint-40b-free:low, glm-5.3-flash-free:low, deepseek-v4.1-flash-free:low |
-| `mech` | flint-40b-free:medium, nemotron-3.5-lightning-free, deepseek-v4.1-flash-free:low, glm-5.3-flash-free:low |
-| `build` | deepseek-v4.1-flash-free:high, glm-5.3-flash-free:high, flint-40b-free:high, beam-free:medium, big-pickle, pulse-alpha-free:high, crouton-alpha-free:high |
-| `hard` | beam-free:high, deepseek-v4.1-flash-free:max, glm-5.3-flash-free:max, big-pickle, pulse-alpha-free:high, crouton-alpha-free:high |
-| `large` (input over about 150k tokens) | beam-free:high, nemotron-3.5-super-vl-free:high, crouton-alpha-free:high |
-| `vision` (screenshots, images) | glm-5.3-flash-free:high, nemotron-3.5-super-vl-free:high, pulse-alpha-free:high, crouton-alpha-free:high |
-| `av` (audio or video input) | mimo-v2.6-flash-free, glm-5.3-flash-free:high, crouton-alpha-free:high |
-
-`--private` keeps only the zero-retention models of any chain (glm-5.3-flash-free, deepseek-v4.1-flash-free; if the chain has neither, it uses both at high).
-
-## Score every build task (0 / 1 / 2 each, takes 10 seconds)
+## Score every build task (0 / 1 / 2 each)
 
 | | 0 | 1 | 2 |
 |---|---|---|---|
@@ -125,205 +68,103 @@ A role is a chain of models in fallback order. `:x` is the variant.
 
 **Hard (the Opus trigger)** = ANY of: D = 2 · two or more dimensions = 2 · A = 2 and C = 2. Scores are printed in the plan.
 
-## Routing (decide per task, in this order; first match wins)
-0. **Design shell or first design draft -> `claude-sonnet-builder` (Sonnet high) or `claude-opus-builder` (Opus medium). NEVER agy or OpenCode.** Default Sonnet; Opus for the most important or complex designs. Later mechanical edits to an approved design (copy changes, pages that follow it) are ordinary builds below.
-1. **Read-only** (find, explain, summarize, extract, format, and any self-check or audit the user's prompt asks for: link check, accessibility check, leftover text search) -> OpenCode `scout`. Such a check is a scout task with its own row in the plan, run after the build phase it checks. The main session never does it, not even by reading files. Chain drained -> Flash scout (`flash`, or `flash-low` for lookups) through `agy-delegate`. Both drained -> held (see When pools are drained). No review.
-2. **Sensitive files -> `claude-opus-builder`, labeled `opus-sensitive (reason)`.** Judged by layer, not by feature: only the sensitive files themselves count (database migrations, access/RLS policies, server functions that move money or stock, auth, crypto). UI, types, labels and thin wrappers of the same feature are ordinary builds: split them out and route them below. Ambiguous specs and architecture decisions are decided by Opus in the plan, then routed as usual.
-3. **Tiny edit** (a rename, a copy tweak, a config value, a one-line fix, exactly described) -> `claude-haiku-builder`, or one Flash-high mini-task when it passes the Flash test (step 6) and Flash is available.
-4. **Special input.** Reads images -> OpenCode `vision`. Audio or video -> `av`. Input over about 150k tokens -> `large`. No Flash or Argon alternative: a drained chain is held.
-5. **Hard** -> **Argon** (medium; `argon-high` for the hardest) through `agy-delegate`. Argon drained (fresh marker, or "drained" returned) -> OpenCode `hard` role, silently. Both drained -> held. Argon never takes anything that is not hard, except fix step 1 for Flash-built work.
-6. **Flash test, for every remaining build task.** Can Opus split the task into small mini-tasks and write an exact spec for each one? An exact spec has: the files the mini-task owns, names and signatures, the markup or data to produce, and a check a tool can run. It needs no design taste and no cross-piece decision (Opus settles those in the briefs). If yes -> **Flash high** mini-tasks (see Flash builds). Flash drained or tripped -> the same mini-tasks on OpenCode `build` (or `mech` when A, R, S, V, D are all 0 and the total is 2 or less), silently. Both drained -> held.
-7. **Everything else** (cannot be specced exactly, but not hard: docs, copy, standard logic, tests) -> one OpenCode `build` task for the whole task. `build` drained -> held. Never move it onto Flash "because it is nearly unlimited", and never onto Argon unless a safety switch says so.
-- Add `--private` to any OpenCode route for S = 1 or a private repo (Data rule).
+## Routing (per task, in this order; first match wins)
+0. **Design shell or first design draft -> `claude-sonnet-builder` (default) or `claude-opus-builder` (most important or complex). NEVER agy or OpenCode.** Later mechanical edits to an approved design are ordinary builds below.
+1. **Read-only** (find, explain, summarize, extract, format, and any self-check or audit the prompt asks for: link, accessibility, leftover-text checks) -> OpenCode `scout`. A check is a scout task with its own plan row, after the build phase it checks. The main session never does it, not even by reading files. Chain drained -> Flash scout (`flash`, `flash-low` for lookups). Both drained -> held. No review.
+2. **Sensitive files -> `claude-opus-builder`, labeled `opus-sensitive (reason)`.** By layer, not feature: only the sensitive files count (migrations, access/RLS policies, server functions that move money or stock, auth, crypto). UI, types, labels and thin wrappers of the same feature are ordinary builds: split out and route below.
+3. **Tiny edit** (rename, copy tweak, config value, one-line fix, exactly described) -> `claude-haiku-builder`, or one Flash-high mini-task when it passes the Flash test (6) and Flash is available.
+4. **Special input.** Images -> OpenCode `vision`. Audio or video -> `av`. Input over about 150k tokens -> `large`. No Flash or Argon alternative: a drained chain is held.
+5. **Hard** -> **Argon** (medium; `argon-high` for the hardest). Argon drained -> OpenCode `hard`, silently. Both drained -> held. Argon takes nothing else, except fix step 1 for Flash-built work.
+6. **Flash test, every remaining build task.** Can Opus split it into small mini-tasks, each with an exact spec (files owned, names and signatures, markup or data to produce, a check a tool can run), needing no design taste and no cross-piece decision (Opus settles those in the briefs)? Yes -> **Flash high** mini-tasks. Flash drained or tripped -> the same mini-tasks on OpenCode `build` (`mech` when A, R, S, V, D are all 0 and the total is 2 or less), silently. Both drained -> held.
+7. **Everything else** (not exactly specable, not hard: docs, copy, standard logic, tests) -> one OpenCode `build` task for the whole task. `build` drained -> held. Never onto Flash "because it is nearly unlimited", never onto Argon unless a safety switch says so.
+- `--private` on any OpenCode route for S = 1 or a private repo.
 - Tie-breakers: unsure `mech` vs `build` -> `build`. Unsure `build` vs `hard` -> `build`, unless D = 2.
-- **Small job.** If the whole request plans to 2 or fewer build tasks and none is S = 2, D = 2 or hard: one task, one route above, normal review. No phases. No scout unless something is genuinely unknown.
-- Every task gets a route, and every route is a builder. No rule hands a task to the main session.
+- **Small job:** 2 or fewer build tasks, none S = 2, D = 2 or hard: one task, one route, normal review, no phases, no scout unless something is genuinely unknown.
+- Every task gets a route, and every route is a builder.
 
-## Quota state (two marker folders, one marker per model)
-- **Antigravity:** `.claude/agy-quota/<model-id>`. `agy-delegate` writes it when a model looks drained (content: UTC ISO time, written atomically). A marker under 6 hours old means drained **(guess; reset times are unpublished)**. List fresh ones: `find .claude/agy-quota -type f ! -name '.tmp.*' -mmin -360`.
-- **OpenCode:** `.claude/opencode-quota/<model-id>` (two lines: `until=<UTC ISO>`, `reason=<log line>`), written by the script. Active while now is before `until`. The `until` is the parsed reset time, else now + 1 hour; unavailable models (not found, region-blocked) are skipped for 24 hours.
-- **Before planning and before each phase:** run `scripts/opencode-run.sh --status --role <role>` for each OpenCode role the plan uses (exit 3 = the whole chain is drained), and list the fresh agy markers. Route around drained models and say so in the plan line.
-- **Flash drained** = a fresh `gemini-3.8-flash-high` marker (builds) or `gemini-3.8-flash-medium` (scouting), or "drained" returned. **Argon drained** = a fresh `gemini-4-argon-medium` marker, or "drained" returned. **An OpenCode role drained** = `--status` exit 3, or the script exited 3.
-- agy Sonnet and Opus have their own markers (`claude-sonnet-5-5-medium`, `claude-opus-5-5-medium`); a drained one is replaced by the Claude agent of the same tier in a fix round. A marker is cleared by deleting its file. If everything looks drained, ask the user to run `/usage` inside `agy` and check `opencode`.
+## Quota state (markers: `until=<UTC ISO>` and `reason=<text>`; active while now < `until`)
+- agy: `.claude/agy-quota/<model-id>`, written by `agy-run.sh` (`until` = reset time, else now + 6 hours, a guess). Check `scripts/agy-run.sh --status`.
+- OpenCode: `.claude/opencode-quota/<model-id>`, written by the script (reset time, else now + 1 hour; unavailable models 24 hours). Check `scripts/opencode-run.sh --status --role <role>` (exit 3 = whole chain drained).
+- Before planning and before each phase run both checks (each OpenCode role in the plan). Route around drained models and say so in the plan line.
+- Drained = an active marker or exit 3. Flash: `gemini-3.8-flash-high` (builds) / `gemini-3.8-flash-medium` (scouting). Argon: `gemini-4-argon-medium`. agy Sonnet / Opus: `claude-sonnet-5-5-medium` / `claude-opus-5-5-medium`.
+- Clear a marker by deleting its file. If everything looks drained, ask the user to run `/usage` inside `agy` and check `opencode`.
 
-## Flash builds (the default route for every task that splits)
-Flash high is small and fast but nearly unlimited, so it only gets small pieces that Opus can spec exactly.
-- **Split** each task that passes the Flash test into mini-tasks: 4 by default, more if needed. Ids are `<task-id>-m1`, `-m2`... Each mini-task owns a disjoint subset of the task's files. Mini-tasks that must touch the same file run one after another (`after`).
-- **Shared contract:** Opus writes the shared contract into every mini-task brief so the pieces fit: file layout, names, signatures, data shapes, and **every CSS class, id, CSS variable and function name the pieces may use**, each one defined by the foundation task or by exactly one mini-task. A piece must not invent a class or id that is not in the contract. To get the foundation's names, the design/foundation brief tells its builder to end the report with a `defines:` line listing every class, id, CSS variable and function it defines; Opus copies that list into the contract. Each brief says which task it belongs to.
-- **Brief header:** `model: flash-high`, `task: <task-id>-mN`, a real `owns:` list (never `none`).
-- **No shell in agy runs.** `agy -p --mode accept-edits` allows file edits but denies shell commands (seen in a test run), so Flash, Argon and agy Sonnet/Opus cannot run tests, linters or checks. Every Flash brief says: "You cannot run shell commands. Do not try. Write the files exactly as specced; list any check you could not run in the report." The spec's check is then run by the reviewer when it is read-only safe (`grep`, `wc`, `node --check`, linters that do not write), otherwise it is listed as not run.
-- **Review ONCE per task, after ALL its mini-tasks finish. Never per mini-task.** `owns:` for the review is every file of the task. The 800-line rule uses the combined changed lines.
-- **Flash drained mid-task:** the mini-tasks not yet built go to OpenCode `build`, silently, with the same briefs (add "Another model may have partly edited the owned files. Inspect them first." only to a mini-task that was cut off). A task whose mini-tasks ran on both pools is reviewed once as a whole and fixed on the Flash-built row.
-- Plan lines list the mini-tasks: `p1-pages -> flash-high x4 (m1 index.html, m2 about.html, m3 pricing.html, m4 faq.html; exact spec)`.
+## Flash builds (default route for every task that splits)
+- **Split** into mini-tasks: 4 by default, more if needed. Ids `<task-id>-m1`, `-m2`... Disjoint file subsets; mini-tasks on the same file run one after another (`after`).
+- **Contract:** every mini-task brief (Flash or OpenCode) says: "Read `.m9/contract.md` first. Use only the names defined there. Do not invent a class, id or function that is not in it." Never copy the list into briefs. A brief carries what is specific to its piece: files, markup or data to produce, a tool-runnable check, its task. In worktree mode it gives the absolute path of the contract file.
+- **No shell in agy runs** (`agy-run.sh` tells the model). The spec's check is run by the reviewer when read-only safe (`grep`, `wc`, `node --check`, non-writing linters), else listed as not run.
+- **Review ONCE per task, after ALL its mini-tasks finish, never per mini-task.** Review `owns:` is every file of the task; the 800-line rule uses combined changed lines.
+- **Flash drained mid-task:** unbuilt mini-tasks go to OpenCode `build`, silently, same briefs (add "Another model may have partly edited the owned files. Inspect them first." only to a cut-off mini-task). A task split over both pools is reviewed once as a whole and fixed on the Flash-built row.
+- Plan line: `p1-pages -> flash-high x4 (m1 index.html, m2 about.html, m3 pricing.html, m4 faq.html; exact spec)`.
 
-## OpenCode builds
-- Task level (Routing 7, hard role, special input) or mini-task level (Flash fallback). One call per task or mini-task.
-- The script fills in `task:`/`owns:` and "Read AGENTS.md first". The brief file has the body only. Free models are weaker than Claude: give exact file names, function names and signatures, and a command that checks the result.
-- `changed lines (owned)` of 0 on a build task is a failure even if the report says "done".
-
-## Safety switches (per run, per pool)
-Opus keeps one tally per pool: Flash-built tasks and OpenCode-built tasks reviewed, and how many failed their FIRST review (re-reviews do not change it). A task counts for the pool that built most of its files (tie: OpenCode).
-- From the 3rd reviewed task of a pool on, after each first review: if MORE than 1 in 3 of that pool's tasks failed their first review (failed x 3 > reviewed), the pool is **tripped** for the rest of the run.
-- A tripped pool gets no NEW tasks. Tasks already building finish and are reviewed as usual. Opus prints "Safety switch tripped: <pool>, <failed> of <reviewed> failed their first review" in the plan and the final summary.
-- **Flash tripped:** Routing 6 goes to OpenCode `build` directly. **OpenCode tripped:** Routing 6 goes to Flash; Routing 7 (not splittable) goes to Argon medium, because free models proved unreliable in this run. **Both tripped:** the rest of the non-design builds go to Argon medium; Argon drained -> held, ask the question.
-- Scouting is not affected. The tallies and switches reset on the next run.
-
-## When pools are drained
-Silent re-routes (Flash <-> OpenCode, Argon -> OpenCode `hard`, OpenCode `scout` -> Flash scout) are already in Routing. A task is **held** only when every pool that may take it is drained or tripped:
-
-| Task | Held when |
-|---|---|
-| Hard (Routing 5) | Argon AND OpenCode `hard` both drained |
-| Splittable (Routing 6) | Flash AND OpenCode `build`/`mech` both drained (both tripped sends it to Argon medium; held only if Argon is drained too) |
-| Non-splittable (Routing 7) | OpenCode `build` drained (or tripped and Argon drained) |
-| Special input (Routing 4) | that OpenCode role drained |
-| Scouting (Routing 1) | OpenCode `scout` AND Flash scout both drained |
-
-Design, sensitive work, tiny edits, reviews and Claude-plan fix steps never wait on any pool.
-1. Do not launch more tasks that need a drained pool. Let running tasks finish and review them. Keep running everything that is not held.
-2. When nothing else can run, stop and ask ONE question, in words (no decision box), then wait:
-   "Free pools are drained for <the held tasks> (Flash back <time>, OpenCode <role> back <time>, Argon back <time>). Wait for the reset, or switch the held tasks to Module 3?"
-3. Do nothing on held tasks (no Claude builds either) until the user answers. A marker older than 6 hours counts as cleared **(guess)**.
-   - Wait -> stop. On the next run re-check the markers and ask again if still drained.
-   - Module 3 -> Module 3 mode for the held tasks.
-   - An answer given in the original prompt ("wait", "use Module 3") counts as the user's answer.
-
-## Module 3 mode (only after the user answered "switch to Module 3")
-Claude-only building with Claude builder sub-agents for the held tasks. No agy or OpenCode for them. Tasks already accepted from Flash, OpenCode or Argon stay as they are. Route each held task with the scores above. First match wins:
-- Read-only -> `scout`. No review.
-- Opus trigger (ANY of: D = 2 · two or more dimensions = 2 · S = 2 and N >= 1 · A = 2 and C = 2) -> `claude-opus-builder`.
-- Easy (A, R, S, V, D all 0, total <= 2, complete spec, a tool can verify it) -> `claude-haiku-builder`.
-- Everything else (design, S = 2, docs, logic) -> `claude-sonnet-builder`.
-- Tie-breakers: unsure haiku vs sonnet -> sonnet. Unsure sonnet vs opus -> sonnet, unless D = 2 or S = 2 -> opus.
-Rules:
-- A task cut off by a drain may be partly edited: add to its brief "An earlier agy or OpenCode run may have partly edited the owned files before it stopped. Inspect them first, then finish the task."
-- Reviews: the usual 800-line rule (and `opus-reviewer` for hard-routed work).
-- Fix ladder: round 1 the same agent, round 2 the next tier up (haiku -> `claude-sonnet-builder` -> `claude-opus-builder`), round 3 `claude-opus-builder`, then record and continue. An opus-builder task stays on opus-builder.
-- Concurrency: total 4, no per-pool caps. Plan lines end with `(Module 3 mode)`. The final summary lists which tasks ran in Module 3 mode.
-- Stay in Module 3 mode for the rest of the session unless the user says to retry the free pools.
+## OpenCode builds and contract file
+- OpenCode: task level (Routing 7, hard, special input) or mini-task level (Flash fallback), one call each. Free models are weaker: give exact file names, function names, signatures and a check command. `changed lines (owned)` of 0 on a build task is a failure even if the report says "done".
+- `.m9/contract.md`: the Phase 0 (foundation/design) task gets it in `owns:`, and its brief says: "When done, write `.m9/contract.md`: every CSS class, id, CSS variable and function name you defined, the file layout, and any data shapes, one per line, grouped by file." No Phase 0 task: the main session writes it from the plan (file layout, names, signatures, data shapes). A later task adding shared names gets it in `owns:` in an earlier phase than the tasks using them, and appends.
 
 ## Task plan and phases
-**Before ANY work starts, print the task plan, every time** (no approval needed). No builder is launched and no file is touched until it is printed, even when the whole job is one task. Run the quota checks first (see Quota state).
+**Before ANY work starts, print the task plan, every time** (no approval needed). No builder is launched and no file touched until it is printed, even for a one-task job. Run the quota checks first.
 
-| id | phase | route (reason) | score | owns | after |
-|---|---|---|---|---|---|
-| p0-shell | 0 | claude-sonnet-builder (design shell) | A1 N1 C1 R0 S0 V1 D0 | `site/styles.css` | - |
-| p1-pages | 1 | flash-high x4 (exact spec) | A0 N0 C1 R0 S0 V0 D0 | m1 `site/about.html`, m2 `site/pricing.html`, m3 `site/faq.html`, m4 `site/contact.html` | p0-shell |
-| p1-notes | 1 | opencode build (not splittable, not hard) | A1 N1 C1 R0 S0 V1 D0 | `docs/notes.md` | p0-shell |
-| p1-sync | 1 | argon-medium (hard: D2) | A1 N1 C2 R1 S0 V2 D2 | `src/sync.ts` | - |
-| p1-money-db | 1 | claude-opus-builder (opus-sensitive: migration and RLS policy) | A1 N1 C1 R2 S2 V1 D0 | `db/migrations/0042_money.sql` | - |
+Columns: `id | phase | route (reason) | score (A N C R S V D, e.g. A1 N1 C1 R0 S0 V1 D0) | owns | after`. Example rows: `p0-shell | 0 | claude-sonnet-builder (design shell) | ... | site/styles.css, .m9/contract.md | -`; `p1-money-db | 1 | claude-opus-builder (opus-sensitive: migration, RLS) | ...`.
 
-- `id`: unique lowercase-kebab slug. It becomes `task:` in the brief, the /tmp file names and the worktree/branch name.
-- `owns`: exact paths (dirs and globs allowed), or `none` for read-only scouting. For a Flash task list the mini-tasks with their files.
-- `after`: ids this task needs finished first.
-- State each choice in one line before launching, including silent re-routes: `p1-pages-m3 -> opencode build (Flash drained; silent re-route)`.
+- `id`: unique lowercase-kebab slug (becomes `task:`, `.m9/briefs/<task>.md`, worktree/branch name). `owns`: exact paths (dirs, globs allowed) or `none` for read-only scouting; Flash lists mini-tasks with files. `after`: ids needed first.
+- State each choice in one line before launching, silent re-routes included: `p1-pages-m3 -> opencode build (Flash drained; silent re-route)`.
+- **Phase 0** = foundations (design shell, shared styles, schema, types, scaffolding); runs alone; skip if none. **Phase N** = every remaining task whose `after` tasks are in earlier phases; parallel on disjoint files. Review a phase completely (diffs, fixes, accepted) before the next. New tasks found in review go to the next phase.
 
-Phases:
-1. **Phase 0 = foundations everything else depends on**: design shell, shared styles, schema, types, scaffolding. It runs alone. Skip it if there are none.
-2. **Phase N (N >= 1) = every remaining task whose `after` tasks are all in earlier phases.** A phase with a multi-step workflow is split into tasks that run in parallel on disjoint files; a single-step phase runs as one job.
-3. **Review a phase completely (diffs, fix steps, accepted) before starting the next.**
-4. Review may reveal new tasks: add them to the next phase and note it in the summary.
-
-## Concurrency caps (defaults, edit this table; all numbers are guesses, agy's and OpenCode's own concurrent limits are unverified)
-
-| Limit | Max running at once |
-|---|---|
-| Total tasks (all pools, including Claude sub-agents) | 4 |
-| Flash (builds and scouts) | 3 |
-| OpenCode (all roles) | 3 |
-| OpenCode `hard` or `large` | 1 |
-| Argon | 1 |
-| agy Sonnet (fix only) | 1 |
-| agy Opus (fix only) | 1 |
-
-- A task counts against its pool from launch until its report returns. Fix steps and scouting count too. Claude sub-agents (builders, fixer, reviewers, scout) count toward the total cap only.
-- Phase larger than the caps: launch what fits, hold the rest, launch each as a slot frees. Order the queue so pools alternate. A re-route keeps its slot.
-- If an `agy-delegate` reports a suspected concurrency error, lower the total cap by 1 (min 1) for the session, relaunch the affected tasks, and note it. If an OpenCode report starts with `note: limits hit on N models`, the free limit is probably shared: lower the OpenCode cap by 1 (min 1) and note it.
+## Concurrency caps (defaults, guesses)
+Max running at once: total 4 (all pools, Claude sub-agents included) · Flash 3 (running `agy-run.sh` calls, builds and scouts) · OpenCode 3 (all roles) · OpenCode `hard` or `large` 1 · Argon 1 · agy Sonnet 1 · agy Opus 1.
+- A task counts from launch until its report returns; fix steps and scouting count. Claude sub-agents count toward the total only. Over the caps: launch what fits, queue the rest, alternate pools; a re-route keeps its slot.
+- `agy-run.sh` exit 4: lower the total cap by 1 (min 1) for the session, relaunch, note it. OpenCode report starting `note: limits hit on N models`: lower the OpenCode cap by 1 (min 1), note it.
 
 ## File ownership
-- Within a phase, every file belongs to exactly one task (for a Flash-built task, one mini-task). No overlaps, including generated and test files.
-- Shared files (nav and layout includes, package.json, lockfiles, route index, global config, barrel files) are owned by one task, or left to an **integration task** in the next phase. Builders report what they need as `needs:` lines; the integration task applies them.
-- Two tasks that need the same file go in different phases (or merge into one task).
-- Dependency installs and formatters are tasks too: own them, run alone, in their own phase.
-- Put the owned list in every brief. Read access is unrestricted.
+- In a phase every file belongs to exactly one task (one mini-task for Flash), generated and test files included. Two tasks needing one file go in different phases (or merge).
+- Shared files (nav/layout includes, package.json, lockfiles, route index, global config, barrels) belong to one task or to an **integration task** in the next phase; builders report needs as `needs:` lines.
+- Installs and formatters are tasks: own them, run alone, own phase.
+- Put the owned list in every brief. Read access is unrestricted. Sets cannot be disjoint: read `.claude/m9/worktree.md`.
 
-## Worktree mode (optional, default off)
-Use only when file sets cannot be disjoint. Needs a git repo with at least one commit; commit the files the builders need first (including AGENTS.md), since a worktree has only committed files. Never copy or link a `.env` file into a worktree: stop and ask.
-1. `git worktree add ../wt-<task> -b m9/<task>`
-2. Brief gets `worktree: ../wt-<task>` (`--worktree ../wt-<task>` for the OpenCode script).
-3. After the phase, a reviewer sub-agent reads `git -C ../wt-<task> diff`. Commit approved work on the throwaway branch only (`git -C ../wt-<task> add -A && git -C ../wt-<task> commit -m "m9/<task>"`), then `git merge --squash m9/<task>` in the main tree without committing. Merge conflicts are never resolved in the main session: send them to a sub-agent with the conflicted files in `owns:`.
-4. `git worktree remove ../wt-<task>` and `git branch -D m9/<task>`.
-Never commit on the user's branch, never push.
-
-## Delegation brief (every task)
-Self-contained: goal, exact file list, acceptance criteria, constraints. The run starts cold and sees only the brief plus AGENTS.md. Save it to `/tmp/brief-<task>.md`.
-- **agy-delegate and Claude builders/reviewers:** the prompt starts with a header, then a blank line, then the body.
+## Delegation brief and launching
+Briefs are self-contained (goal, exact file list, acceptance criteria, constraints); the run sees only the brief plus AGENTS.md.
+- **Scripts (agy, OpenCode):** body-only file `.m9/briefs/<task>.md`; the script adds `task:`, `owns:`, "Read AGENTS.md first".
+- **Claude sub-agents (builders, fixer, reviewers, scout):** header, blank line, body:
 ```
-model: <alias>          (agy-delegate only: flash-high, flash, flash-low, argon, argon-high; sonnet and opus for fix tasks only)
 task: <slug>
 owns: <comma-separated files, or none>
 worktree: <path>        (optional)
-design                  (optional, bare line, Claude builders only; agy-delegate refuses it)
+design                  (optional, bare line, Claude design builders only)
 ```
-- **OpenCode tasks:** the file has the body only. The script adds `task:`/`owns:` and "Read AGENTS.md first".
-- A Flash mini-task brief also says which task it belongs to and carries the shared contract. A fix task (`<id>-rN`) gets all the task's files in `owns:` and a body with the whole task diff and the defect list; it runs on OpenCode `hard` (a Flash-built task's first fix), or on `model: argon`, `sonnet` or `opus`, as the ladder says.
+- All tasks of a phase go out in ONE message with `run_in_background: true`: one Agent call per Claude sub-agent (`subagent_type` = agent name), one Bash call per script task or mini-task:
+```
+scripts/agy-run.sh --model <alias> --task <slug> --owns "<comma list|none>" --brief .m9/briefs/<slug>.md [--worktree <path>]
+scripts/opencode-run.sh --role <role> --task <slug> --owns "<comma list|none>" --brief .m9/briefs/<slug>.md [--private] [--start <id[:variant]>] [--worktree <path>]
+```
+  Not executable: `bash scripts/<name>.sh ...`. Never add `--auto`, `--dangerously-skip-permissions` or any permission-bypass flag. Wait for completion notifications; never poll with sleep; never start the next phase early.
+- Fix tasks (`<id>-rN`): read `.claude/m9/fix-ladders.md` first.
 
-## Launching
-- All tasks of a phase go out in ONE message, each with `run_in_background: true`: one Agent call per `agy-delegate` or Claude sub-agent, one Bash call per OpenCode task:
-```
-scripts/opencode-run.sh --role <role> --task <slug> --owns "<comma list|none>" --brief /tmp/brief-<slug>.md [--private] [--start <id[:variant]>] [--worktree <path>]
-```
-  If the script is not executable (some mounts), run it as `bash scripts/opencode-run.sh ...`. Never add `--auto` or any flag that bypasses permissions. Wait for the completion notifications. Never poll with sleep. Never start the next phase early.
-- `agy` runs inside `agy-delegate` with `run_in_background`, `--mode accept-edits`, `--print-timeout 0`. Never `--dangerously-skip-permissions`.
-- Claude sub-agents: Agent tool with `subagent_type: claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer`, `claude-haiku-builder`, `scout`, `sonnet-reviewer` or `opus-reviewer`; `agy-delegate` for agy.
-- `--start <id[:variant]>` makes an OpenCode fix round begin with the model that ran the first time (copy it from the report's `model that ran:` line); the rest of the chain follows if it is limited.
-- OpenCode exit codes: 0 success, review. 1 other error: read it, fix the cause or send the task to the next fix step. 2 `opencode` missing or bad arguments: hard blocker, tell the user. 3 `drained: <role> chain until <time>`: re-route silently where Routing allows, else hold the task (see When pools are drained).
-- Fix steps: after reviewing a phase, send all defect fixes together in one message, same caps. A fix task keeps the original `owns:` (for a split task, every file) and gets `task: <id>-r1` ... `<id>-r4`, matching its step in the ladder (a skipped step leaves its number unused). Print every Claude-plan fix in the plan line and the summary.
+| Exit | `opencode-run.sh` | `agy-run.sh` | Main session does |
+|---|---|---|---|
+| 0 | success | success, report printed | review |
+| 1 | other error | other error (login, crash, timeout) | read it; fix the cause or send to the next fix step |
+| 2 | `opencode` missing or bad arguments | refused alias/combination or bad arguments, or `agy` missing / model id unknown | refused: a routing mistake, fix the call. Tool missing: hard blocker, tell the user |
+| 3 | `drained: <role> chain until <time>` | first line `drained: <model-id> until <time>`; owned files may be partly edited | re-route silently where Routing allows, else hold (`drained-pools.md`) |
+| 4 | not used | `concurrency: <text>`, no marker | lower total cap by 1, relaunch, note it |
 
 ## Review
-Reviewer by changed lines. Changed lines = added + removed from `git diff --numstat -- <owned files>` plus the line count of new untracked owned files (`agy-delegate` and the script report the sum; otherwise compute it read-only). For a split task use the combined diff of the whole task.
-
-| Changed lines (whole task, owned files) | Reviewer |
-|---|---|
-| 800 or fewer | `sonnet-reviewer` (Claude Sonnet, Claude plan) |
-| more than 800 | `opus-reviewer` (Claude Opus medium, Claude plan, a sub-agent) |
-| any size, but the task is hard-routed (Argon or OpenCode `hard`) or `opus-sensitive` | `opus-reviewer` |
-
-- The rule applies to every build: Flash, OpenCode, Argon, Claude builders (`claude-opus-builder` sensitive builds included) and tiny edits. No agy or OpenCode model reviews, ever. The reviewer is always at least a grade above the implementer. The main session never reads a full diff.
-- After a fix step, review again on the task's whole diff. If fixes push a task over 800 lines, the review moves up to `opus-reviewer`.
-- The first review of each Flash- and OpenCode-built task feeds the safety-switch tallies. Give the reviewer the header (`task:`, `owns:`, optional `worktree:`) and the acceptance criteria. It returns PASS or FAIL with a numbered defect list. Non-blocking notes are listed apart; do not send them back unless they break a criterion. On a re-review, tell it the previous defects.
-- Check each report's "possibly from other parallel tasks" list: every path must be owned by another task in the phase. A stray edit to a file nobody owns is a defect: after the phase (nothing running), list it in the summary or send it to a builder to revert. The main session never reverts a file itself.
+Changed lines = added + removed from `git diff --numstat -- <owned files>` plus lines of new untracked owned files (scripts report the sum; else compute read-only). A split task uses the combined diff.
+- 800 or fewer -> `sonnet-reviewer`. More than 800, or hard-routed (Argon, OpenCode `hard`) or `opus-sensitive` at any size -> `opus-reviewer`.
+- Applies to every build: Flash, OpenCode, Argon, Claude builders (sensitive included), tiny edits. No agy or OpenCode model reviews, ever (reviewers must not edit). The reviewer is at least a grade above the implementer. The main session never reads a full diff.
+- After a fix step, review again on the whole diff (over 800 moves up to `opus-reviewer`); tell the reviewer the previous defects.
+- The first review of each Flash- and OpenCode-built task feeds the safety-switch tallies. Give the reviewer the header and the acceptance criteria. It returns PASS or FAIL with numbered defects; non-blocking notes are not sent back unless they break a criterion.
+- Check each report's "possibly from other parallel tasks" list: every path must be owned by another task in the phase. A stray edit to an unowned file is a defect: after the phase, list it in `.m9/last-run.md` or send it to a builder to revert. The main session never reverts a file.
 - Never accept "done" on a report alone. Free-model and Flash reports are leads, not facts.
 
-## Fix ladders (max 4 steps per task)
-When a task fails review, send the defect list to the next step of the ladder for whoever built it. A drained agy step (Argon excepted) is replaced by the Claude agent of the same tier, so the ladder never gets longer: agy Sonnet -> `claude-sonnet-fixer` (Flash row) or `claude-sonnet-builder` (other rows); agy Opus -> `claude-opus-builder`. A drained Argon step or OpenCode step is skipped.
+## Final summary (always required)
+**To the user, at most 8 short plain lines, no table, no pool jargon:** (1) what was built and how to open or run it; (2) what is still wrong or not done, or "nothing open"; (3) who did the work, one line, e.g. "Flash built 4 pieces, free models 1, Claude designed the styles and did 3 reviews and 1 fix"; (4) anything the user must do or decide (a pending drained-pools question goes here); (5) "Details: .m9/last-run.md". Also print any line the user's prompt explicitly asks for (for example an "Elapsed" line or a files list).
 
-| Built by | r1 | r2 | r3 | r4 |
-|---|---|---|---|---|
-| Flash (also a task split across Flash and OpenCode) | **OpenCode `hard` role** (a fresh task: whole task diff + defect list, owns all the task's files, `--private` if needed) | **Argon medium** | agy Sonnet (medium) | agy Opus (medium) |
-| OpenCode `build`, `mech` | same model (`--start`) | **Argon medium** | agy Sonnet | agy Opus |
-| Argon | same Argon | agy Sonnet | agy Opus | record and continue |
-| OpenCode `hard` | same model (`--start`) | agy Sonnet | agy Opus | record and continue |
-| OpenCode `large`, `vision`, `av` (agy image/audio ability unverified) | same model (`--start`) | `claude-sonnet-builder` | `claude-opus-builder` | record and continue |
-| `claude-sonnet-builder` (design) | same agent | `claude-opus-builder` | record and continue | |
-| `claude-opus-builder` (design or sensitive) | same agent | record and continue | | |
-| `claude-haiku-builder` (tiny edit) | same agent | `claude-sonnet-builder` | `claude-opus-builder` | |
-
-- Flash never fixes and never reviews; its first fix goes to OpenCode. Never Argon high for fixes.
-- agy Sonnet and agy Opus are used only here. They never take a first build, a review, a scout or a design.
-- A fix of a split task is one task for the whole task, not per mini-task.
-- `--private` tasks keep `--private` in OpenCode fix rounds. A task routed as `opus-sensitive` follows the `claude-opus-builder` row.
-- A drained OpenCode chain in a fix round skips straight to the next step. Do not ask the user for that.
-- After the last step still failing: record the defect in the final summary and continue.
-- Module 3 mode has its own ladder.
-
-## Final summary
-One summary, always required: what was built; the tasks routed as `opus-sensitive`, with reasons; the table below; fixes by step, with every Claude-plan fix called out; which tasks ran on Flash (with mini-tasks), OpenCode, Argon and Claude, and why; every silent re-route; the safety-switch tallies per pool and whether either tripped; any drained-pools question and the answer, and which tasks ran in Module 3 mode; cap changes, worktree use, open items, minor choices made.
+**Detailed record -> `.m9/last-run.md`, overwritten each run:** the table below; `opus-sensitive` tasks with reasons; fixes by step, every Claude-plan fix called out; every silent re-route; safety-switch tallies and trips; drained-pools question and answer, Module 3 mode tasks; cap changes, worktree use, open items, minor choices.
 
 | phase | task | pool (Flash / OpenCode / Argon / Claude / Module 3) | model requested | model that ran | chain walk or re-route | reviewer (changed lines) | fix steps | result after review |
 |---|---|---|---|---|---|---|---|---|
 
-After each task, append one line to `TASKS.md`: `ID | phase | pool | model that ran | score | reviewer | rounds | result | notes`. This is the data for tuning routing later.
+After each task append one line to `.m9/TASKS.md`: `ID | phase | pool | model that ran | score | reviewer | rounds | result | notes`.
 
 ## If everything fails
-Only when `agy` or `opencode` is broken, or the Claude plan is out of quota, or pools are drained and the user has not answered: stop and tell the user. Do not do any of the work yourself, not even a small part: the main session never implements.
+Only when `agy` or `opencode` is broken, the Claude plan is out of quota, or pools are drained and the user has not answered: stop and tell the user. Do none of the work yourself: the main session never implements.

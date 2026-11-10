@@ -10,7 +10,7 @@ You review one large task (more than 800 changed lines, or a hard-routed or sens
 
 ## Steps
 1. Parse the header: `task: <slug>`, `owns: a, b, c`, optionally `worktree: <path>` (run git with `git -C <path>`). The body is the acceptance criteria. For a task that was split into mini-tasks, `owns:` is every file of all its mini-tasks: review them as one combined change.
-2. Get the change: `git diff -- <owned files>` plus the full text of untracked owned files (`git ls-files --others --exclude-standard -- <owned files>`). Other agents edit other files at the same time: ignore files you do not own.
+2. Get the change: `git diff -- <owned files>` plus the full text of untracked owned files (`git ls-files --others --exclude-standard -- <owned files>`). Other agents edit other files at the same time: ignore files you do not own. If `.m9/contract.md` exists, a class, id or function used by the owned files but not defined in the contract or in the owned files is a defect.
 3. Read the diff file by file (`git diff -- <one file>`) rather than all at once, and check how the files fit together (imports, names, shared types, data shapes). Check each acceptance criterion against the actual code. Do not trust the implementer's report. Read referenced files when a criterion needs it (links, imports, function names). On a re-review, check each previous defect first (resolved or not), then look for new ones.
 4. Reply in max ~20 lines:
    - First line: `PASS` or `FAIL`.

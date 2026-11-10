@@ -57,20 +57,20 @@ Print: files created, whether the self-check passed, issues found and fixed, and
 
 ## What to look for
 
-- A plan table is printed first, before any file is touched, with a route and a score for every task (sensitive ones labeled `opus-sensitive (reason)`). Quota checks (`opencode-run.sh --status`, agy markers) ran before it.
-- The main chat edits no project files and runs no builds. It only launches builders and reads short reports.
-- The design shell went to `claude-sonnet-builder` or `claude-opus-builder`, never to agy or OpenCode.
-- Tasks that split appear as Flash-high mini-tasks (`-m1`, `-m2`...). The self-check (links, accessibility, leftover text) is a scout row in the plan and ran on OpenCode `scout` (Flash scout only if that chain was drained), not in the main chat. Argon appears only for a hard task or a fix.
+- A plan table is printed first, before any file is touched, with a route and a score for every task (sensitive ones labeled `opus-sensitive (reason)`). Quota checks (`scripts/agy-run.sh --status` and `scripts/opencode-run.sh --status`) ran before it.
+- The main chat edits no project files and runs no builds. It only launches builders and scripts, writes files under `.m9/`, and reads short reports.
+- The design shell went to `claude-sonnet-builder` or `claude-opus-builder`, never to agy or OpenCode. That task owned `.m9/contract.md` and wrote it; mini-task briefs say "Read `.m9/contract.md` first" and do not repeat the names.
+- Tasks that split appear as Flash-high mini-tasks (`-m1`, `-m2`...), run by `scripts/agy-run.sh` in background Bash calls (no relay sub-agent). The self-check (links, accessibility, leftover text) is a scout row in the plan and ran on OpenCode `scout` (Flash scout only if that chain was drained), not in the main chat. Argon appears only for a hard task or a fix.
 - Every task that edits files got ONE review: `sonnet-reviewer` at 800 changed lines or fewer, `opus-reviewer` above (or for hard/sensitive work). No agy or OpenCode model reviewed anything.
-- A failed review followed the ladder for whoever built it (Flash: OpenCode `hard`, Argon medium, agy Sonnet, agy Opus; OpenCode: same model, Argon medium, agy Sonnet, agy Opus). A drained agy Sonnet or Opus step was replaced by the Claude agent of the same tier.
-- The final table has one row per task with the pool, the model that ran, any re-route, the reviewer and the result; `TASKS.md` got one line per task; the "Elapsed" line printed.
+- A failed review followed the ladder for whoever built it (Flash: OpenCode `hard`, Argon medium, agy Sonnet, agy Opus; OpenCode: same model, Argon medium, agy Sonnet, agy Opus), and `.claude/m9/fix-ladders.md` was read first. A drained agy Sonnet or Opus step was replaced by the Claude agent of the same tier.
+- The final message to the user is at most 8 short lines (what was built, what is open, who did the work, what you must decide, "Details: .m9/last-run.md") plus the "Elapsed" line. The one-row-per-task table is in `.m9/last-run.md`, and `.m9/TASKS.md` got one line per task.
 
 ## Optional: test the silent fallbacks
 
 Run these in the project folder (Mac, or Git Bash on Windows), then paste Prompt A.
 
-1. **Flash drained.** `mkdir -p .claude/agy-quota && date -u +%Y-%m-%dT%H:%M:%SZ > .claude/agy-quota/gemini-3.8-flash-high`. Expect: the plan shows the mini-tasks on OpenCode `build` with a "Flash drained; silent re-route" line, and no question to you.
+1. **Flash drained.** `mkdir -p .claude/agy-quota && printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > .claude/agy-quota/gemini-3.8-flash-high`. Expect: the plan shows the mini-tasks on OpenCode `build` with a "Flash drained; silent re-route" line, and no question to you.
 2. **OpenCode build drained.** `mkdir -p .claude/opencode-quota && for m in deepseek-v4.1-flash-free glm-5.3-flash-free flint-40b-free beam-free big-pickle pulse-alpha-free crouton-alpha-free; do printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > ".claude/opencode-quota/$m"; done`. Expect: splittable work stays on Flash; any non-splittable task is held.
-3. **Everything drained.** Do both 1 and 2, plus `for m in gemini-4-argon-medium gemini-4-argon-high claude-sonnet-5-5-medium claude-opus-5-5-medium; do date -u +%Y-%m-%dT%H:%M:%SZ > ".claude/agy-quota/$m"; done`. Expect: design and sensitive work still run on Claude, and Opus asks ONE question: wait for the reset, or switch to Module 3? It must not choose for you.
+3. **Everything drained.** Do both 1 and 2, plus `for m in gemini-4-argon-medium gemini-4-argon-high claude-sonnet-5-5-medium claude-opus-5-5-medium; do printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > ".claude/agy-quota/$m"; done`. Expect: design and sensitive work still run on Claude, and Opus asks ONE question: wait for the reset, or switch to Module 3? It must not choose for you.
 
-Clear the markers when you are done: `rm .claude/agy-quota/* .claude/opencode-quota/*`.
+`scripts/agy-run.sh --status` should list the agy markers you set. Clear the markers when you are done: `rm .claude/agy-quota/* .claude/opencode-quota/*`.

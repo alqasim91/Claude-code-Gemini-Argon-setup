@@ -1,5 +1,7 @@
 # Claude plans, Gemini 4 Argon builds: Mac setup with agy
 
+> Note: this is the original two-file setup, kept for the first video. The current modules use different `agy` flags and a one-command installer. See the Module 9 README (`Module 9 Claude + Antigravity + Opencode/README.md`).
+
 Claude Code (desktop app, Opus) plans, reviews and verifies. Gemini 4 Argon writes the code through Google's Antigravity command line tool, `agy`. Follow the steps in order. Copy each command exactly.
 
 ## What you need
