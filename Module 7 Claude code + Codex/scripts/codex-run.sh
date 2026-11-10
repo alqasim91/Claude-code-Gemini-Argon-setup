@@ -48,10 +48,13 @@ ID_TERRA="gpt-6.1-terra"
 ID_SOL="gpt-6.1-sol"
 # Astra (gpt-6-astra) is deliberately not used.
 
+RUN_DIR=".m7"                              # run folder in the project: briefs, logs (scratch files go in $RUN_DIR/logs)
+
 die() { echo "$*" >&2; exit "${2:-2}"; }
 
 ROOT="$PWD"                                 # the quota markers always live here, even in worktree mode
 QDIR="$ROOT/.claude/codex-quota"
+LOGDIR="$ROOT/$RUN_DIR/logs"
 
 # ---- Time helpers (GNU date, with a macOS/BSD fallback) ----
 to_epoch() {      # UTC ISO "YYYY-MM-DDTHH:MM:SSZ" -> epoch seconds (empty on failure)
@@ -152,11 +155,12 @@ else
   [ ${#OWNED[@]} -gt 0 ] || die "--owns is empty (use \"none\" for read-only)"
 fi
 
-BEFORE="/tmp/codex-before-$TASK.txt"
-AFTER="/tmp/codex-after-$TASK.txt"
-BRIEF_OUT="/tmp/codex-brief-$TASK.md"
-LOG="/tmp/codex-log-$TASK.txt"
-LAST="/tmp/codex-last-$TASK.md"
+mkdir -p "$LOGDIR"
+BEFORE="$LOGDIR/codex-before-$TASK.txt"
+AFTER="$LOGDIR/codex-after-$TASK.txt"
+BRIEF_OUT="$LOGDIR/codex-brief-$TASK.md"
+LOG="$LOGDIR/codex-log-$TASK.txt"
+LAST="$LOGDIR/codex-last-$TASK.md"
 
 IS_GIT=0
 git -C "$RUNDIR" rev-parse --git-dir >/dev/null 2>&1 && IS_GIT=1
@@ -247,7 +251,7 @@ report() {   # $1 = model that ran (or "none")
       git -C "$RUNDIR" diff --stat -- "${OWNED[@]}" | sed 's/^/  /'
       git -C "$RUNDIR" status --short -- "${OWNED[@]}" | sed 's/^/  /'
     fi
-    local ex=(":(exclude).claude/codex-quota")
+    local ex=(":(exclude).claude/codex-quota" ":(exclude)$RUN_DIR")
     for p in "${OWNED[@]}"; do ex+=(":(exclude)$p"); done
     git -C "$RUNDIR" status --short -- . "${ex[@]}" | sort > "$AFTER"
     local out

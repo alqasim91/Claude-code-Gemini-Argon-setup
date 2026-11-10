@@ -7,7 +7,7 @@
 - Never commit or push. Leave changes uncommitted for review.
 - Run the project's tests/lint before reporting done, if they exist and your tools allow shell commands; scope them to your files where possible. Failures in files you do not own: report them, do not fix them. If checks were not run, say so.
 - Do not read or edit secrets (.env, keys, credentials).
-- Scratch files go in /tmp, not in the repo.
+- Scratch files go in `.m8/logs/` or /tmp, not in the repo (`.m8/` is git-ignored).
 - Read-only task (`owns: none`)? Change nothing. Report findings only.
 - Do exactly what the brief says. Do not add features, files or refactors it does not ask for. Use only the tools you have; if a tool call fails twice, say so in the report instead of retrying.
 - Final report: files changed, checks run, `needs:` lines, anything not done. Max 10 lines.

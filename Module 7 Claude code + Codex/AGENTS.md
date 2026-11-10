@@ -7,6 +7,7 @@
 - Never commit or push. Leave changes uncommitted for review.
 - Run the project's tests/lint before reporting done, if they exist and your sandbox allows shell commands; scope them to your files where possible. Failures in files you do not own: report them, do not fix them. If checks were not run, say so.
 - Do not read or edit secrets (.env, keys, credentials).
-- Scratch files go in /tmp, not in the repo.
+- Scratch files go in `.m7/logs/` or /tmp, not elsewhere in the repo.
+- If the brief tells you to read `.m7/contract.md`, read it first and use only the names in it.
 - Read-only task (`owns: none`)? Change nothing. Report findings only.
 - Final report: files changed, checks run, `needs:` lines, anything not done. Max 10 lines.

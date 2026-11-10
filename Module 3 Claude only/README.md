@@ -8,6 +8,9 @@ Tuned for Pro limits: the 5-hour and weekly limits are shared with claude.ai.
 
 ```
 Module-3/
+├── install.sh             ← one-command installer (Mac, Linux, Git Bash)
+├── install.ps1            ← one-command installer (Windows PowerShell)
+├── settings.json          ← the approvals list the installer adds
 ├── CLAUDE.md              ← the orchestrator's rules (routing, scoring, review loop)
 └── agents/
     ├── scout.md           ← Haiku · read-only search and research
@@ -28,11 +31,33 @@ Module-3/
 ## Setup (Mac and Windows)
 
 1. **Create the project folder.** Any name, anywhere. Example: `my-app`.
-2. **Paste the files in the project folder.** Get the files from this folder on GitHub (or unzip `module-3-files.zip` and open `Module-3`). Copy the two items, `CLAUDE.md` and the `agents` folder, into `my-app`.
+2. **Unzip `module-3-files.zip` inside `my-app`.** It creates a `Module-3` folder.
 3. **Open a terminal in the folder.**
    - Mac: right-click `my-app` > **New Terminal at Folder**. (If missing: System Settings > Keyboard > Keyboard Shortcuts > Services.)
    - Windows: open `my-app` in File Explorer, click the address bar, type `powershell` and press Enter.
-4. **Paste this command** and press Enter. It moves `agents` into the hidden `.claude` folder where Claude Code looks for it.
+4. **Run one command.**
+   - Mac:
+     ```
+     bash Module-3/install.sh
+     ```
+   - Windows (PowerShell):
+     ```
+     powershell -ExecutionPolicy Bypass -File Module-3\install.ps1
+     ```
+
+It prints one line per step. Running it again is safe: it changes nothing the second time.
+
+**What it does**
+- Copies the 7 agents to `.claude/agents/`.
+- Copies `CLAUDE.md`. If you already have your own, it does not overwrite it: it saves the new text as `CLAUDE.module-3.md` and tells you to paste it in. An older Module 3 copy is backed up and replaced.
+- Adds the approvals list to `.claude/settings.json` (merged, your other settings stay).
+- Starts git and makes a first commit if the folder has none. It never touches an existing repo or your `.env` files.
+
+<details>
+<summary>Manual install (only if you prefer to copy by hand)</summary>
+
+1. Copy `CLAUDE.md` and the `agents` folder from `Module-3` into `my-app`.
+2. Move `agents` into the hidden `.claude` folder:
    - Mac:
      ```
      mkdir -p .claude && mv agents .claude/agents
@@ -41,14 +66,22 @@ Module-3/
      ```
      New-Item -ItemType Directory -Force .claude | Out-Null; Move-Item agents .claude\agents
      ```
+3. Optional: copy `Module-3/settings.json` to `.claude/settings.json` (the approvals list). If you already have that file, paste its lines into yours.
+4. Reviews read `git diff`. If the folder is not a git repo yet, run `git init && git add -A && git commit -m "start"` once.
+
+</details>
 
 Result:
 
 ```
 my-app/
 ├── CLAUDE.md
-└── .claude/agents/   ← the seven agent files
+└── .claude/
+    ├── agents/   ← the seven agent files
+    └── settings.json
 ```
+
+**Check it worked:** `ls -la .claude/agents`. You should see 7 files: `scout`, `haiku-implementer`, `implementer`, `opus-implementer`, `reviewer`, `opus-reviewer`, `fixer`.
 
 5. **Start Claude Code in `my-app`.** Desktop app: **New session**, then pick the folder. CLI: type `claude` in the same terminal (Windows CLI needs Git for Windows).
 6. **Choose Opus** in the model picker. The main chat must be Opus: it is the orchestrator.
@@ -61,6 +94,9 @@ Add a README.md to this project with a one-paragraph description.
 Opus should post a plan with a score and route per task, delegate, then report PASS or FAIL after a review. In the CLI, `/agents` lists all seven agents.
 
 Don't rename any file: the agent names in `CLAUDE.md` must match the file names.
+
+## Approvals
+The installer adds an allow-list to `.claude/settings.json`: read-only commands such as `git status`, `git diff`, `git log`, `ls`, `wc` and `date`. So a run does not stop to ask for each one. It also blocks reading `.env` files. Everything else, including edits, still asks as usual.
 
 ---
 
@@ -83,6 +119,6 @@ Don't rename any file: the agent names in `CLAUDE.md` must match the file names.
 ## Troubleshooting
 
 - **Opus writes code itself.** The main chat is not reading `CLAUDE.md`. Check it sits in the project root, then start a new session.
-- **`/agents` shows nothing.** The files are not in `.claude/agents/`. Re-run the step 4 command from inside `my-app`.
+- **`/agents` shows nothing.** The files are not in `.claude/agents/`. Re-run the install command from inside `my-app`.
 - **Can't see `.claude`.** Hidden folder. Mac: Cmd+Shift+. in Finder. Windows: File Explorer > View > Show > Hidden items.
 - **Everything runs on Opus.** Make sure the model picker was set before the session started, and each agent file keeps its `model:` line.

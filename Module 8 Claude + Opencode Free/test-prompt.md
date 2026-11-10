@@ -30,13 +30,13 @@ Print: files created, whether the self-check passed, issues found and fixed, and
 
 ## What to check after the run
 
-- A plan table was printed before any work started: id, phase, route with a reason, score, owned files, after.
-- Each route matches the first-match list in `CLAUDE.md`. `TASKS.md` has one line per task, with the model that ran.
-- Phase 0 holds the shared design (`styles.css`) and went to `claude-sonnet-builder` or `claude-opus-builder`. No design work went to a free model.
-- Later tasks in one phase were launched together with `scripts/opencode-run.sh`, and no two own the same file.
+- A plan table was printed before any work started: id, phase, route with a reason, score, owned files, after. `scripts/opencode-run.sh --status --role <role>` ran before it.
+- Each route matches the first-match list in `CLAUDE.md`. `.m8/TASKS.md` has one line per task, with the model that ran.
+- Phase 0 holds the shared design (`styles.css`) and went to `claude-sonnet-builder` or `claude-opus-builder`. No design work went to a free model. That task owned `.m8/contract.md` and wrote it; briefs of later tasks say "Read `.m8/contract.md` first" and do not repeat the names.
+- Briefs are in `.m8/briefs/<task>.md`. Later tasks in one phase were launched together with `scripts/opencode-run.sh` (background Bash calls, no relay sub-agent), and no two own the same file. Script scratch files are in `.m8/logs/`.
 - Roles matched the work: `products.js` and page logic on `build`, mechanical pages or checks on `mech` or `scout`. Nothing near secrets ran on a non-zero-retention model with `--private` missing (this prompt has no secrets).
 - Reports show `chain walk:`. If a model hit its limit, `.claude/opencode-quota/<model-id>` exists, `scripts/opencode-run.sh --status --role build` lists it, and the next model took the task without Opus stopping.
 - Reviews followed the ladder: `sonnet-reviewer` for diffs up to 400 changed lines; Opus read bigger diffs itself. No separate Opus reviewer was spawned.
-- Fixes (if any) went in order: same model, `hard` role, Claude Sonnet high, Claude Opus medium. Check the final table for rounds.
-- If a whole chain drained (exit 3), Opus asked "wait or Module 3?" in words and did nothing on Claude for build work until you answered. After Module 3, plan lines end with `(Module 3 mode)`.
-- The final per-phase table, the printed "Elapsed: Xm Ys" line, and the files on disk (open `index.html`, use the filter, add to cart, reload, submit the form empty).
+- Fixes (if any) went in order: same model, `hard` role, Claude Sonnet high, Claude Opus medium, and `.claude/m8/fix-ladders.md` was read first. Check the table in `.m8/last-run.md` for rounds.
+- If a whole chain drained (exit 3), `.claude/m8/drained-chain.md` was read and Opus asked "wait or Module 3?" in words and did nothing on Claude for build work until you answered. After Module 3, plan lines end with `(Module 3 mode)`.
+- The final message to the user is at most 8 short lines (what was built, what is open, who did the work, what you must decide, "Details: .m8/last-run.md") plus the "Elapsed: Xm Ys" line. The per-phase table is in `.m8/last-run.md`. Check the files on disk (open `index.html`, use the filter, add to cart, reload, submit the form empty).

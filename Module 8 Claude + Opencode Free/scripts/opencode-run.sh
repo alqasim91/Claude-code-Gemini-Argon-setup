@@ -11,6 +11,8 @@
 # The script walks the role's chain. A model with an active quota marker is skipped. A model that
 # hits a limit gets a marker and the script moves to the next model in the chain, by itself.
 # Markers: .claude/opencode-quota/<model-id>, two lines: until=<UTC ISO>, reason=<line>.
+# Scratch files (log, before/after lists, generated brief) live in .m8/logs/ of the project, not in /tmp,
+# so two projects running the same task slug do not collide.
 #
 # Exit codes:
 #   0 success (report printed)         1 other error (last 20 log lines printed)
@@ -24,10 +26,19 @@
 # Unavailable models: rc != 0 and the log matches UNAVAIL_RE (model not found, region-blocked, not supported).
 # The model gets a marker for 24 hours (reason "unavailable: ...") and the walk goes on, like a limit. These
 # do not count toward the shared-limit note. Free models change often; Beam and Pulse are blocked in some countries.
-# Timeout: RUN_TIMEOUT seconds per model (default 1800, 0 = off) when `timeout` or `gtimeout` exists. A timed-out
-# model is NOT skipped: the script prints "opencode timed out on <id> after <n>s ..." plus the log tail, exit 1
-# (often a permission prompt nobody can answer).
-# With --status: prints active markers. Exit 3 if every model of --role (default build) is drained, else 0.
+# Timeout: RUN_TIMEOUT seconds per model (default 1800, 0 = off) when `timeout` or `gtimeout` exists. The first
+# timeout is not a quota drain: the model gets NO marker, the walk notes "<id>(timed out after <n>s)" and goes on
+# with the next model. A second timeout in a row stops the script with exit 1 and the log tail (usually a
+# permission prompt nobody can answer: allow the tool in opencode.json). A run that ends any other way resets
+# the count. If the chain runs out right after one timeout, exit 1 (not 3: it is not a quota drain).
+# Model discovery (DISCOVER=1, 0 = off): `opencode models opencode` lists the ids offered now. The list is cached
+# in .claude/opencode-quota/.models for 6 hours. Chain entries that are not offered are skipped without a marker
+# (shown as "not offered now, skipped"). For roles build and hard, a new "*-free" id that no chain names is added
+# at the tail (never with --private). If the list is empty or the command fails, discovery is "unknown" and the
+# chain is used as written. If every entry would be dropped, the full chain is used (discovery may be wrong).
+# With --private and no zero-retention model offered: exit 3, never a fallback to another model.
+# With --status: prints active markers and "not offered now: <ids>". Models not offered count as limited.
+# Exit 3 if every model of --role (default build) is drained, else 0.
 set -euo pipefail
 
 # ---- Flags (confirmed from `opencode run --help` on the user's machine, 2026-11-04) ----
@@ -45,6 +56,8 @@ AGENT_READONLY="plan"               # UNVERIFIED: built-in read-only agent, chec
 LIMIT_DEFAULT=3600                  # seconds a limited model stays skipped when no reset time is found (guess)
 DAY=86400
 RUN_TIMEOUT=1800                    # seconds per model run; 0 = off. Needs `timeout` (or `gtimeout` on macOS)
+DISCOVER=1                          # 1 = ask `opencode models` which ids are offered now; 0 = trust the chains
+MODELS_MAX_AGE=21600                # seconds the discovered model list is reused (6 hours)
 QUOTA_RE='rate.?limit|429|quota|usage limit|limit reached|exhausted|too many requests|try again later|FreeUsageLimit'
 UNAVAIL_RE='model not found|unknown model|not available|unavailable in your (region|country)|no such model|ProviderModelNotFound|model .*not supported'
 ZERO_RETENTION="glm-5.3-flash-free deepseek-v4.1-flash-free"   # no training, no retention: the only models for private code
@@ -68,6 +81,7 @@ chain_for() {
 die() { echo "$*" >&2; exit "${2:-2}"; }
 
 ROOT="$PWD"                         # markers always live here, even in worktree mode
+RUN_DIR=".m8"                       # run folder in the project: scratch files in logs/, briefs and notes live here too
 QDIR="$ROOT/.claude/opencode-quota"
 
 # ---- Time helpers (GNU date, with a macOS/BSD fallback) ----
@@ -91,6 +105,73 @@ marker_until() {    # prints the until time (UTC ISO) if the model's marker is a
   return 0
 }
 
+timeout_tool() {   # prints timeout or gtimeout if one exists, else nothing
+  if command -v timeout >/dev/null 2>&1; then echo timeout
+  elif command -v gtimeout >/dev/null 2>&1; then echo gtimeout; fi
+  return 0
+}
+
+# available_models: prints the model ids OpenCode offers now, one per line. Prints nothing when unknown
+# (discovery off, command failed, no ids). Cache: $QDIR/.models, reused while under MODELS_MAX_AGE old.
+available_models() {
+  local cache="$QDIR/.models" now m raw line tok out="" t tb cmd
+  [ "$DISCOVER" = "1" ] || return 0
+  command -v "$OC_BIN" >/dev/null 2>&1 || return 0
+  now=$(date +%s)
+  if [ -s "$cache" ]; then
+    m=$(stat -c %Y "$cache" 2>/dev/null || stat -f %m "$cache" 2>/dev/null || echo 0)
+    [[ "$m" =~ ^[0-9]+$ ]] || m=0
+    if [ $((now - m)) -ge 0 ] && [ $((now - m)) -lt "$MODELS_MAX_AGE" ]; then cat "$cache"; return 0; fi
+  fi
+  tb=$(timeout_tool)
+  if [ -n "$tb" ]; then raw=$("$tb" 30 "$OC_BIN" models "$PROVIDER" 2>/dev/null < /dev/null) || return 0
+  else raw=$("$OC_BIN" models "$PROVIDER" 2>/dev/null < /dev/null) || return 0; fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    tok=""; read -r tok _ <<< "$line" || true
+    tok=${tok%$'\r'}; tok=${tok#"$PROVIDER/"}
+    if [[ "$tok" =~ ^[a-z0-9][a-z0-9._-]*$ ]]; then
+      case " $out " in *" $tok "*) ;; *) out="$out $tok" ;; esac
+    fi
+  done <<< "$raw"
+  [ -n "$out" ] || return 0
+  out=$(printf '%s\n' $out)
+  t=$(mktemp "$QDIR/.tmp.XXXXXX") || { echo "$out"; return 0; }
+  printf '%s\n' "$out" > "$t" && mv -f "$t" "$cache" || rm -f "$t"
+  echo "$out"
+  return 0
+}
+
+in_disc() { case "$DISC_SP" in *" $1 "*) return 0 ;; esac; return 1; }
+
+# apply_discovery <role> <chain> <private 0|1>: sets globals CHAIN (filtered), NA_IDS (dropped ids),
+# NEW_FREE (ids appended at the tail), DISCOVERED (the list, newline separated), DISC_SP (same, space padded).
+apply_discovery() {
+  local role=$1 private=${3:-0} e id kept="" allids="" r
+  CHAIN=$2; NA_IDS=""; NEW_FREE=""; DISC_SP=""
+  DISCOVERED=$(available_models)
+  [ -n "$DISCOVERED" ] || return 0
+  DISC_SP=" $(printf '%s\n' "$DISCOVERED" | tr '\n' ' ')"
+  for e in $2; do
+    id=${e%%:*}
+    if in_disc "$id"; then kept="$kept $e"; else NA_IDS="$NA_IDS $id"; fi
+  done
+  if [ -z "$kept" ]; then NA_IDS=""; return 0; fi     # nothing left: discovery may be wrong, use the full chain
+  CHAIN="${kept# }"
+  if [ "$private" -eq 0 ] && { [ "$role" = build ] || [ "$role" = hard ]; }; then
+    for r in scout mech build hard large vision av; do
+      for e in $(chain_for "$r"); do allids="$allids ${e%%:*}"; done
+    done
+    for id in $DISCOVERED; do
+      case "$id" in *-free) ;; *) continue ;; esac
+      case " $allids " in *" $id "*) continue ;; esac
+      NEW_FREE="$NEW_FREE $id"
+    done
+    NEW_FREE="${NEW_FREE# }"
+    if [ -n "$NEW_FREE" ]; then CHAIN="$CHAIN $NEW_FREE"; fi
+  fi
+  return 0
+}
+
 # filter_private "<chain>": keep only zero-retention models; if none left, use glm and deepseek high
 filter_private() {
   local out="" e id z
@@ -106,8 +187,10 @@ filter_private() {
 status_for_role() {
   local role=$1 chain e id u total=0 drained=0 now earliest=""
   chain=$(chain_for "$role") || die "unknown role: $role"
+  apply_discovery "$role" "$chain" 0
   now=$(date +%s)
-  for e in $chain; do
+  for id in $NA_IDS; do total=$((total + 1)); drained=$((drained + 1)); done
+  for e in $CHAIN; do
     id=${e%%:*}; total=$((total + 1))
     u=$(marker_until "$id")
     if [ -n "$u" ]; then
@@ -116,6 +199,7 @@ status_for_role() {
       if [ -z "$earliest" ] || [[ "$u" < "$earliest" ]]; then earliest="$u"; fi
     fi
   done
+  if [ -n "$NA_IDS" ]; then echo "not offered now: ${NA_IDS# }"; fi
   echo "role $role: $drained of $total models limited"
   if [ "$drained" -eq "$total" ]; then echo "drained: $role chain until $earliest"; return 3; fi
   return 0
@@ -160,12 +244,26 @@ if [[ "$RUN_TIMEOUT" =~ ^[0-9]+$ ]] && [ "$RUN_TIMEOUT" -gt 0 ]; then
   elif command -v gtimeout >/dev/null 2>&1; then TMO=gtimeout; fi
 fi
 
-[ $PRIVATE -eq 1 ] && CHAIN=$(filter_private "$CHAIN")
+apply_discovery "$ROLE" "$CHAIN" "$PRIVATE"          # sets CHAIN, NA_IDS, NEW_FREE, DISCOVERED
+if [ $PRIVATE -eq 1 ]; then
+  CHAIN=$(filter_private "$CHAIN")
+  if [ -n "$DISCOVERED" ]; then       # never fall back to a model that is not zero-retention, or not offered
+    kept=""
+    for e in $CHAIN; do
+      if in_disc "${e%%:*}"; then kept="$kept $e"; else NA_IDS="$NA_IDS ${e%%:*}"; fi
+    done
+    CHAIN="${kept# }"
+  fi
+fi
 if [ -n "$START" ]; then            # fix round 1: start with the same model, then the rest of the chain
   [ $PRIVATE -eq 1 ] && { case " $ZERO_RETENTION " in *" ${START%%:*} "*) ;; *) die "--start is not a zero-retention model, cannot be used with --private" ;; esac; }
-  rest=""
-  for e in $CHAIN; do [ "${e%%:*}" = "${START%%:*}" ] || rest="$rest $e"; done
-  CHAIN="$START$rest"
+  if [ -n "$DISCOVERED" ] && ! in_disc "${START%%:*}"; then
+    case " $NA_IDS " in *" ${START%%:*} "*) ;; *) NA_IDS="$NA_IDS ${START%%:*}" ;; esac
+  else
+    rest=""
+    for e in $CHAIN; do [ "${e%%:*}" = "${START%%:*}" ] || rest="$rest $e"; done
+    CHAIN="$START$rest"
+  fi
 fi
 
 # ---- Owned pathspecs ----
@@ -181,8 +279,9 @@ else
   [ ${#OWNED[@]} -gt 0 ] || die "--owns is empty (use \"none\" for read-only)"
 fi
 
-BEFORE="/tmp/oc-before-$TASK.txt"; AFTER="/tmp/oc-after-$TASK.txt"
-BRIEF_OUT="/tmp/oc-brief-$TASK.md"; LOG="/tmp/oc-log-$TASK.txt"
+LOGDIR="$ROOT/$RUN_DIR/logs"; mkdir -p "$LOGDIR"
+BEFORE="$LOGDIR/oc-before-$TASK.txt"; AFTER="$LOGDIR/oc-after-$TASK.txt"
+BRIEF_OUT="$LOGDIR/oc-brief-$TASK.md"; LOG="$LOGDIR/oc-log-$TASK.txt"
 : > "$LOG"                          # no stale log from an earlier run of the same task slug
 IS_GIT=0
 git -C "$RUNDIR" rev-parse --git-dir >/dev/null 2>&1 && IS_GIT=1
@@ -247,6 +346,7 @@ report() {   # $1 = model that ran (id[:variant]) or "none"; $2 = path tried sum
   echo "role: $ROLE$([ $PRIVATE -eq 1 ] && echo ' (private: zero-retention models only)')"
   echo "model that ran: $1"
   echo "chain walk: $2"
+  if [ -n "$NEW_RAN" ]; then echo "new free models tried at the tail: ${NEW_RAN# }"; fi
   if [ $IS_GIT -eq 0 ]; then
     echo "not a git repo: no diff or change count"
   else
@@ -256,7 +356,7 @@ report() {   # $1 = model that ran (id[:variant]) or "none"; $2 = path tried sum
       git -C "$RUNDIR" diff --stat -- "${OWNED[@]}" | sed 's/^/  /'
       git -C "$RUNDIR" status --short -- "${OWNED[@]}" | sed 's/^/  /'
     fi
-    local ex=(":(exclude).claude/opencode-quota")
+    local ex=(":(exclude).claude/opencode-quota" ":(exclude)$RUN_DIR")
     for p in "${OWNED[@]}"; do ex+=(":(exclude)$p"); done
     git -C "$RUNDIR" status --short -- . "${ex[@]}" | sort > "$AFTER"
     local out
@@ -274,7 +374,14 @@ report() {   # $1 = model that ran (id[:variant]) or "none"; $2 = path tried sum
 }
 
 # ---- Walk the chain ----
-WALK="" HITS=0 PARTIAL=0 EARLIEST=""
+WALK="" HITS=0 PARTIAL=0 EARLIEST="" CONSEC=0 LAST_TO="" NEW_RAN=""
+for id in $NA_IDS; do WALK="$WALK $id(not offered now, skipped)"; done
+if [ -z "$CHAIN" ]; then            # only possible with --private: no zero-retention model is offered
+  echo "drained: $ROLE chain (no zero-retention model is offered now)"
+  echo "tried:${WALK}"
+  report "none (no zero-retention model is offered now)" "${WALK# }"
+  exit 3
+fi
 for entry in $CHAIN; do
   id=${entry%%:*}; var=""; [[ "$entry" == *:* ]] && var=${entry#*:}
   u=$(marker_until "$id")
@@ -283,6 +390,7 @@ for entry in $CHAIN; do
     if [ -z "$EARLIEST" ] || [[ "$u" < "$EARLIEST" ]]; then EARLIEST="$u"; fi
     continue
   fi
+  case " $NEW_FREE " in *" $id "*) NEW_RAN="$NEW_RAN $id" ;; esac
   build_brief "$PARTIAL"
   args=("$FLAG_MODEL" "$PROVIDER/$id")
   [ -n "$var" ] && args+=("$FLAG_VARIANT" "$var")
@@ -295,10 +403,18 @@ for entry in $CHAIN; do
   (cd "$RUNDIR" && "${cmd[@]}") > "$LOG" 2>&1 < /dev/null || rc=$?
 
   if [ $rc -eq 124 ] && [ -n "$TMO" ]; then
-    echo "opencode timed out on $PROVIDER/$id after ${RUN_TIMEOUT}s (possibly waiting on a permission prompt). Last 20 log lines:"
-    tail -n 20 "$LOG"
-    exit 1
+    CONSEC=$((CONSEC + 1))
+    if [ $CONSEC -ge 2 ]; then
+      echo "opencode timed out twice in a row ($LAST_TO, $id) after ${RUN_TIMEOUT}s each. Probably a permission prompt nobody can answer: allow the tool in opencode.json."
+      tail -n 20 "$LOG"
+      exit 1
+    fi
+    LAST_TO="$id"
+    WALK="$WALK $id(timed out after ${RUN_TIMEOUT}s)"      # no marker: a timeout is not a quota drain
+    if [ $IS_GIT -eq 1 ] && [ $READONLY -eq 0 ] && [ "$(changed_lines)" -gt 0 ]; then PARTIAL=1; fi
+    continue
   fi
+  CONSEC=0
 
   limited=0 unavail=0
   qline=$(grep -Ei "$QUOTA_RE" "$LOG" | head -n 1 | tr -d '\r' | cut -c1-160 || true)
@@ -343,6 +459,12 @@ for entry in $CHAIN; do
   if [ $IS_GIT -eq 1 ] && [ $READONLY -eq 0 ] && [ "$(changed_lines)" -gt 0 ]; then PARTIAL=1; fi
 done
 
+if [ $CONSEC -eq 1 ]; then          # the last model that ran timed out and nothing is left: not a quota drain
+  echo "opencode timed out on $PROVIDER/$LAST_TO after ${RUN_TIMEOUT}s and no other model in the $ROLE chain was left to try."
+  echo "tried:${WALK}"
+  report "none (timed out: $LAST_TO; owned files may be partly edited)" "${WALK# }"
+  exit 1
+fi
 echo "drained: $ROLE chain until $EARLIEST"
 echo "tried:${WALK}"
 report "none (every model in the $ROLE chain is limited; owned files may be partly edited)" "${WALK# }"
