@@ -6,6 +6,8 @@ What changed from Module 6: `agy` is replaced by Codex. There is no relay subage
 
 # Part 1: Setup
 
+Short on time? Skip to Step 4 (Install the files): Claude Code can do most of this for you.
+
 Do the steps in order. Each step shows **Mac** (Terminal) and **Windows** (PowerShell).
 
 ## Step 1. Get a ChatGPT plan that includes Codex
@@ -36,6 +38,20 @@ codex exec --help
 Look for `-m` (model), `-c` (config override), `--sandbox` and `-o` (output file). The flags come from third-party docs. If a name differs, edit the variables at the top of `scripts/codex-run.sh`.
 
 ## Step 4. Install the files (one command)
+
+**Easiest: let Claude Code set it up**
+
+1. Put `module-7-files.zip` in your project folder.
+2. Open Claude Code in that folder. Desktop app: **New session**, then pick the folder. Terminal: type `claude` in the folder.
+3. Paste this line:
+   ```
+   Unzip module-7-files.zip in this folder, then read module-7/SETUP.md and follow it.
+   ```
+
+Claude Code unzips the files, asks you one question (may it edit files without asking each time), installs the module, checks the outside tools and tells you what is left. It will ask your approval for the first one or two commands; that is normal, the approvals list does not exist yet. Signing in to `codex` stays with you, because it opens a browser. When it finishes, start a new session and choose Opus.
+
+**Or run the installer yourself**
+
 Unzip `module-7-files.zip` **inside your project folder** (it creates a `module-7` folder). Open a terminal in the project folder. Run one command.
 
 **Mac**

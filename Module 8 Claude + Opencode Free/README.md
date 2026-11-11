@@ -6,6 +6,8 @@ Same shape as Module 7 (Codex): Opus runs `scripts/opencode-run.sh` itself in th
 
 # Part 1: Setup
 
+Short on time? Skip to Step 4 (Install the files): Claude Code can do most of this for you.
+
 Each step shows **Mac** (Terminal) and **Windows** (PowerShell).
 
 ## Step 1. Install OpenCode
@@ -37,6 +39,20 @@ opencode run --help
 This module uses `-m`, `--variant`, `--dir`, `--agent`. They are confirmed on your install (2026-11-04). It never uses `--auto`. One flag is still unverified: the script runs read-only scouting with `--agent plan`. Check with `opencode agent list` that a read-only `plan` agent exists. If not, edit `AGENT_READONLY` at the top of the script.
 
 ## Step 4. Install the files (one command)
+
+**Easiest: let Claude Code set it up**
+
+1. Put `module-8-files.zip` in your project folder.
+2. Open Claude Code in that folder. Desktop app: **New session**, then pick the folder. Terminal: type `claude` in the folder.
+3. Paste this line:
+   ```
+   Unzip module-8-files.zip in this folder, then read module-8/SETUP.md and follow it.
+   ```
+
+Claude Code unzips the files, asks you one question (may it edit files without asking each time), installs the module, checks the outside tools and tells you what is left. It will ask your approval for the first one or two commands; that is normal, the approvals list does not exist yet. OpenCode needs no sign-in. When it finishes, start a new session and choose Opus.
+
+**Or run the installer yourself**
+
 Unzip `module-8-files.zip` **inside your project folder**. It creates a `module-8` folder there. Open a terminal in the project folder (the one that now contains `module-8`). Run one command.
 
 **Mac**

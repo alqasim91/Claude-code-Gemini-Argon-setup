@@ -12,6 +12,7 @@ Module-3/
 ├── install.ps1            ← one-command installer (Windows PowerShell)
 ├── settings.json          ← the approvals list the installer adds
 ├── CLAUDE.md              ← the orchestrator's rules (routing, scoring, review loop)
+├── SETUP.md               ← setup steps Claude Code follows
 └── agents/
     ├── scout.md           ← Haiku · read-only search and research
     ├── haiku-implementer.md ← Haiku · simple, fully specified edits
@@ -29,6 +30,19 @@ Module-3/
 - The files in this folder, downloaded from GitHub (or `module-3-files.zip`, unzipped)
 
 ## Setup (Mac and Windows)
+
+**Easiest: let Claude Code set it up**
+
+1. Put `module-3-files.zip` in your project folder.
+2. Open Claude Code in that folder. Desktop app: **New session**, then pick the folder. Terminal: type `claude` in the folder.
+3. Paste this line:
+   ```
+   Unzip module-3-files.zip in this folder, then read Module-3/SETUP.md and follow it.
+   ```
+
+Claude Code unzips the files, asks you one question (may it edit files without asking each time), installs the module and tells you what is left. It will ask your approval for the first one or two commands; that is normal, the approvals list does not exist yet. When it finishes, start a new session and choose Opus.
+
+**Or run the installer yourself**
 
 1. **Create the project folder.** Any name, anywhere. Example: `my-app`.
 2. **Unzip `module-3-files.zip` inside `my-app`.** It creates a `Module-3` folder.

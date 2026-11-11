@@ -13,6 +13,8 @@ It combines Module 6 Flash builder and Module 8. Same rules as both: the main ch
 
 # Part 1: Setup
 
+Short on time? Skip to Step 4 (Install the files): Claude Code can do most of this for you.
+
 Each step shows **Mac** (Terminal) and **Windows** (PowerShell).
 
 **Windows note:** the two runner scripts are bash scripts. Claude Code on Windows needs Git for Windows and runs its commands through Git Bash, so this normally works. If the scripts do not start, run Claude Code from Git Bash or WSL.
@@ -49,6 +51,20 @@ opencode --version
 Then `opencode models opencode`. The free ones end in `-free` (plus `big-pickle`). Built for these ten, checked 2026-11-04: `beam-free`, `big-pickle`, `crouton-alpha-free`, `deepseek-v4.1-flash-free`, `flint-40b-free`, `glm-5.3-flash-free`, `mimo-v2.6-flash-free`, `nemotron-3.5-lightning-free`, `nemotron-3.5-super-vl-free`, `pulse-alpha-free`. You do not need to keep this list up to date: the script asks OpenCode which free models exist at run time. The script uses `-m`, `--variant`, `--dir`, `--agent` and never `--auto`. Check that a read-only `plan` agent exists with `opencode agent list`; if not, edit `AGENT_READONLY` at the top of the script.
 
 ## Step 4. Install the files (one command)
+
+**Easiest: let Claude Code set it up**
+
+1. Put `module-9-files.zip` in your project folder.
+2. Open Claude Code in that folder. Desktop app: **New session**, then pick the folder. Terminal: type `claude` in the folder.
+3. Paste this line:
+   ```
+   Unzip module-9-files.zip in this folder, then read module-9/SETUP.md and follow it.
+   ```
+
+Claude Code unzips the files, asks you one question (may it edit files without asking each time), installs the module, checks the outside tools and tells you what is left. It will ask your approval for the first one or two commands; that is normal, the approvals list does not exist yet. Signing in to `agy` stays with you, because it opens a browser. OpenCode needs no sign-in. When it finishes, start a new session and choose Opus.
+
+**Or run the installer yourself**
+
 Unzip `module-9-files.zip` **inside your project folder** (it creates a `module-9` folder). Open a terminal in the project folder. Run one command.
 
 **Mac**
