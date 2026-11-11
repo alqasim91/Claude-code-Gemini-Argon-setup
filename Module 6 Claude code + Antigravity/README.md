@@ -52,12 +52,15 @@ powershell -ExecutionPolicy Bypass -File module-6\install.ps1
 ```
 It prints one line per step. Running it again is safe: it changes nothing the second time.
 
+The installer asks one question: may Claude edit files in this folder without asking each time? Answer `y` for runs you can leave alone, or `n` to approve each edit yourself. To answer yes up front, add `--accept-edits` to the Mac command or `-AcceptEdits` to the Windows command. You can change it later in `.claude/settings.json`.
+
 **What it does**
 - Copies the 7 agents to `.claude/agents/` and the 3 rule files to `.claude/m6/`.
 - Copies `scripts/agy-run.sh` and makes it runnable.
 - Copies `CLAUDE.md` and `AGENTS.md`. If you already have your own, it does not overwrite them: it saves the new text as `CLAUDE.module-6.md` and tells you to paste it in. An older Module 6 copy is backed up and replaced.
 - Removes the old `agy-delegate` agent if you have it (a script replaced it).
 - Adds the approvals list to `.claude/settings.json` (merged, your other settings stay).
+- Asks the one edit question described above and, only if you say yes, sets `"defaultMode": "acceptEdits"` in that file.
 - Adds two lines to `.gitignore`: `.claude/agy-quota/` and `.m6/`.
 - Starts git and makes a first commit if the folder has none. It never touches your `.env` files.
 - Checks that `agy` is installed and tells you how to get it if not.
@@ -90,6 +93,7 @@ Add-Content .gitignore ".claude/agy-quota/", ".m6/"
 Remove-Item -ErrorAction SilentlyContinue .claude\agents\agy-delegate.md
 ```
 Already have a `CLAUDE.md`, `AGENTS.md` or `.claude/settings.json`? Do not overwrite them: paste the new text into your file. Not using git yet? The review step reads `git diff`, so run `git init && git add -A && git commit -m "start"` once.
+Want Claude to edit files here without asking each time? Add `"defaultMode": "acceptEdits"` inside `"permissions"` in `.claude/settings.json`.
 </details>
 
 **Check it worked:** `ls -la .claude/agents .claude/m6 scripts`. `.claude` is hidden, so Finder will not show it (press `Cmd+Shift+.`). You should see:
@@ -115,7 +119,7 @@ It should print `agy: 0 models limited`.
 3. Watch for: a task plan table first, the design shell built by `claude-sonnet-builder` or `claude-opus-builder` (never by `agy`), builds on Argon launched together, a Sonnet review of each task, and a short final message. The main chat itself edits no files and reads no full diff.
 
 ## Approvals
-The installer adds an allow-list to `.claude/settings.json`: the runner script, read-only git commands and the `.m6/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. Never add `--dangerously-skip-permissions`. Unverified: it is not confirmed that auto mode honors the allow rules.
+The installer adds an allow-list to `.claude/settings.json`: the runner script, read-only git commands and the `.m6/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. The installer also asks one question: may Claude edit files in this folder without asking each time? Yes sets `"defaultMode": "acceptEdits"` in that file (`--accept-edits` on Mac or `-AcceptEdits` on Windows answers yes up front); no leaves every edit asking as usual. Never add `--dangerously-skip-permissions`. Unverified: it is not confirmed that auto mode honors the allow rules.
 
 ## The run folder
 Claude keeps its working files in `.m6/` in your project (hidden from git): `briefs/` (one brief per task), `logs/` (script scratch), `contract.md` (the shared names list on the Flash route), and `last-run.md` (the detailed record of the last run).

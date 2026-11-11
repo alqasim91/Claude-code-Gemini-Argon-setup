@@ -47,10 +47,13 @@ Module-3/
 
 It prints one line per step. Running it again is safe: it changes nothing the second time.
 
+The installer asks one question: may Claude edit files in this folder without asking each time? Answer `y` for runs you can leave alone, or `n` to approve each edit yourself. To answer yes up front, add `--accept-edits` to the Mac command or `-AcceptEdits` to the Windows command. You can change it later in `.claude/settings.json`.
+
 **What it does**
 - Copies the 7 agents to `.claude/agents/`.
 - Copies `CLAUDE.md`. If you already have your own, it does not overwrite it: it saves the new text as `CLAUDE.module-3.md` and tells you to paste it in. An older Module 3 copy is backed up and replaced.
 - Adds the approvals list to `.claude/settings.json` (merged, your other settings stay).
+- Asks the one edit question described above and, only if you say yes, sets `"defaultMode": "acceptEdits"` in that file.
 - Starts git and makes a first commit if the folder has none. It never touches an existing repo or your `.env` files.
 
 <details>
@@ -66,7 +69,7 @@ It prints one line per step. Running it again is safe: it changes nothing the se
      ```
      New-Item -ItemType Directory -Force .claude | Out-Null; Move-Item agents .claude\agents
      ```
-3. Optional: copy `Module-3/settings.json` to `.claude/settings.json` (the approvals list). If you already have that file, paste its lines into yours.
+3. Optional: copy `Module-3/settings.json` to `.claude/settings.json` (the approvals list). If you already have that file, paste its lines into yours. Want Claude to edit files here without asking each time? Add `"defaultMode": "acceptEdits"` inside `"permissions"` in `.claude/settings.json`.
 4. Reviews read `git diff`. If the folder is not a git repo yet, run `git init && git add -A && git commit -m "start"` once.
 
 </details>
@@ -96,7 +99,7 @@ Opus should post a plan with a score and route per task, delegate, then report P
 Don't rename any file: the agent names in `CLAUDE.md` must match the file names.
 
 ## Approvals
-The installer adds an allow-list to `.claude/settings.json`: read-only commands such as `git status`, `git diff`, `git log`, `ls`, `wc` and `date`. So a run does not stop to ask for each one. It also blocks reading `.env` files. Everything else, including edits, still asks as usual.
+The installer adds an allow-list to `.claude/settings.json`: read-only commands such as `git status`, `git diff`, `git log`, `ls`, `wc` and `date`. So a run does not stop to ask for each one. It also blocks reading `.env` files. The installer also asks one question: may Claude edit files in this folder without asking each time? Yes sets `"defaultMode": "acceptEdits"` in that file (`--accept-edits` on Mac or `-AcceptEdits` on Windows answers yes up front); no leaves every edit asking as usual.
 
 ---
 

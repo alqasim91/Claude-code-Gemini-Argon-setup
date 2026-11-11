@@ -2,6 +2,15 @@
 # Run it from YOUR project folder:
 #   powershell -ExecutionPolicy Bypass -File module-7\install.ps1
 # Safe to run twice.
+# Options: -AcceptEdits (answer yes to the edit question), -NoAcceptEdits (answer no).
+param(
+    [switch]$AcceptEdits,
+    [switch]$NoAcceptEdits
+)
+if ($AcceptEdits -and $NoAcceptEdits) {
+    Write-Host 'Usage: install.ps1 [-AcceptEdits | -NoAcceptEdits]'
+    exit 2
+}
 $ErrorActionPreference = 'Stop'
 
 $Src  = [System.IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\', '/')
@@ -175,6 +184,83 @@ if (-not (Test-Path -LiteralPath $tplPath -PathType Leaf)) {
         } catch {
             Say "NOTE: could not update .claude\settings.json, so I left it alone."
             Settings-ByHand
+        }
+    }
+}
+
+# 4b. Edit approval: ask once whether Claude may edit files without asking each time.
+# Only ever sets permissions.defaultMode to "acceptEdits". Never any other mode.
+function Edits-ByHand {
+    Say '      To allow edits without asking, add "defaultMode": "acceptEdits" inside "permissions" in .claude\settings.json by hand.'
+}
+
+if (-not (Test-Path -LiteralPath $setPath -PathType Leaf)) {
+    Say "skipped: there is no .claude\settings.json to change."
+    Edits-ByHand
+} else {
+    $cur2 = $null
+    $ok2 = $true
+    try {
+        $cur2Text = [System.IO.File]::ReadAllText($setPath).TrimStart([char]0xFEFF)
+        $cur2 = $cur2Text | ConvertFrom-Json
+        if ($null -eq $cur2 -or $cur2 -isnot [System.Management.Automation.PSCustomObject]) { $ok2 = $false }
+        elseif ($null -ne $cur2.PSObject.Properties['permissions'] -and $cur2.permissions -isnot [System.Management.Automation.PSCustomObject]) { $ok2 = $false }
+    } catch {
+        $ok2 = $false
+    }
+    if (-not $ok2) {
+        Say "NOTE: .claude\settings.json is not valid JSON, so I left edit approval alone."
+        Edits-ByHand
+    } else {
+        $curMode = $null
+        if ($null -ne $cur2.PSObject.Properties['permissions'] -and $null -ne $cur2.permissions.PSObject.Properties['defaultMode']) {
+            $curMode = $cur2.permissions.defaultMode
+        }
+        if ($null -ne $curMode) {
+            Say "skipped: edit approval is already set to $curMode"
+        } else {
+            $answer = 'ask'
+            if ($AcceptEdits) { $answer = 'yes' } elseif ($NoAcceptEdits) { $answer = 'no' }
+            if ($answer -eq 'ask') {
+                $interactive = $false
+                try { $interactive = ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) } catch { $interactive = $false }
+                if ($interactive) {
+                    Say "Claude's builders write and change files in this folder while they work."
+                    Say "Let them do that without asking you each time? Runs can then finish while you are away."
+                    Say "You can change this later in .claude\settings.json."
+                    $reply = ''
+                    try { $reply = Read-Host 'Allow edits without asking? [y/N]' } catch { $reply = '' }
+                    if ($null -eq $reply) { $reply = '' }
+                    if (@('y', 'Y', 'yes', 'Yes', 'YES') -ccontains $reply.Trim()) { $answer = 'yes' } else { $answer = 'no' }
+                } else {
+                    $answer = 'none'
+                }
+            }
+            if ($answer -eq 'yes') {
+                try {
+                    if ($null -eq $cur2.PSObject.Properties['permissions']) {
+                        $cur2 | Add-Member -NotePropertyName 'permissions' -NotePropertyValue ([pscustomobject]@{})
+                    }
+                    $perm2 = $cur2.permissions
+                    if ($null -eq $perm2.PSObject.Properties['defaultMode']) {
+                        $perm2 | Add-Member -NotePropertyName 'defaultMode' -NotePropertyValue 'acceptEdits'
+                    } else {
+                        $perm2.defaultMode = 'acceptEdits'
+                    }
+                    $json2 = ConvertTo-Json -InputObject $cur2 -Depth 10
+                    $null = $json2 | ConvertFrom-Json   # must parse again before we write it
+                    [System.IO.File]::WriteAllText($setPath, $json2 + "`n", $Utf8NoBom)
+                    Mark-Changed
+                    Say "ok: Claude can edit files in this folder without asking (acceptEdits)"
+                } catch {
+                    Say "NOTE: could not update .claude\settings.json, so I left it alone."
+                    Edits-ByHand
+                }
+            } elseif ($answer -eq 'no') {
+                Say "ok: Claude will ask before each file edit. To change later, run this installer again with -AcceptEdits"
+            } else {
+                Say "skipped: no terminal to ask on. To allow edits without asking, run this installer again with -AcceptEdits"
+            }
         }
     }
 }

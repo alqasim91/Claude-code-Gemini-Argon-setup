@@ -48,11 +48,14 @@ powershell -ExecutionPolicy Bypass -File module-7\install.ps1
 ```
 It prints one line per step. Running it again is safe: it changes nothing the second time. The runner script is a bash script: on Windows run Claude Code from Git Bash or WSL.
 
+The installer asks one question: may Claude edit files in this folder without asking each time? Answer `y` for runs you can leave alone, or `n` to approve each edit yourself. To answer yes up front, add `--accept-edits` to the Mac command or `-AcceptEdits` to the Windows command. You can change it later in `.claude/settings.json`.
+
 **What it does**
 - Copies the 5 agents to `.claude/agents/` and the 4 rule files to `.claude/m7/`.
 - Copies `scripts/codex-run.sh` and makes it runnable.
 - Copies `CLAUDE.md` and `AGENTS.md`. If you already have your own, it does not overwrite them: it saves the new text as `CLAUDE.module-7.md` and tells you to paste it in. An older Module 7 copy is backed up and replaced.
 - Adds the approvals list to `.claude/settings.json` (merged, your other settings stay).
+- Asks the one edit question described above and, only if you say yes, sets `"defaultMode": "acceptEdits"` in that file.
 - Adds two lines to `.gitignore` (`.claude/codex-quota/` and `.m7/`).
 - Starts git and makes a first commit if the folder has none. It never touches your `.env` files.
 - Checks that `codex` is installed and tells you how to get it if not.
@@ -83,6 +86,7 @@ Copy-Item module-7\settings.json .claude\settings.json
 Add-Content .gitignore ".claude/codex-quota/", ".m7/"
 ```
 Already have a `CLAUDE.md`, `AGENTS.md` or `.claude/settings.json`? Do not overwrite them: paste the new text into your file. Not using git yet? The review step reads `git diff`, so run `git init && git add -A && git commit -m "start"` once.
+Want Claude to edit files here without asking each time? Add `"defaultMode": "acceptEdits"` inside `"permissions"` in `.claude/settings.json`.
 </details>
 
 **Check it worked:** `ls -la .claude/agents .claude/m7 scripts`. You should see:
@@ -109,7 +113,7 @@ Type `/agents`. You should see `claude-sonnet-builder`, `claude-opus-builder`, `
 Open `module-7/test-prompt.md`, copy the prompt into Claude Code unchanged. Then use its "What to check" list.
 
 ## Approvals
-The installer adds an allow-list to `.claude/settings.json`: the runner script, read-only git commands and the `.m7/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. The script never bypasses the Codex sandbox or approvals. Do not add flags that do.
+The installer adds an allow-list to `.claude/settings.json`: the runner script, read-only git commands and the `.m7/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. The installer also asks one question: may Claude edit files in this folder without asking each time? Yes sets `"defaultMode": "acceptEdits"` in that file (`--accept-edits` on Mac or `-AcceptEdits` on Windows answers yes up front); no leaves every edit asking as usual. The script never bypasses the Codex sandbox or approvals. Do not add flags that do.
 
 # Part 2: How it works
 

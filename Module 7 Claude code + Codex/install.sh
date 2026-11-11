@@ -2,6 +2,7 @@
 # Module 7 installer. Run it from YOUR project folder:
 #   bash path/to/install.sh
 # Works on macOS, Linux and Git Bash. Safe to run twice.
+# Options: --accept-edits (answer yes to the edit question), --no-accept-edits (answer no).
 set -eu
 
 SRC="$(cd "$(dirname "$0")" && pwd -P)"
@@ -10,6 +11,16 @@ CHANGED=0
 
 say() { printf '%s\n' "$*"; }
 changed() { CHANGED=1; }
+
+usage() { printf '%s\n' "Usage: bash install.sh [--accept-edits | --no-accept-edits]" >&2; exit 2; }
+ACCEPT=ask
+for arg in "$@"; do
+  case "$arg" in
+    --accept-edits) if [ "$ACCEPT" = no ]; then usage; fi; ACCEPT=yes ;;
+    --no-accept-edits) if [ "$ACCEPT" = yes ]; then usage; fi; ACCEPT=no ;;
+    *) usage ;;
+  esac
+done
 
 if [ "$DEST" = "$SRC" ]; then
   say "Run this from your project folder, not from inside the module folder."
@@ -162,6 +173,108 @@ with open(sys.argv[1], "w", encoding="utf-8") as f:
        settings_by_hand ;;
   esac
 fi
+
+# 4b. Edit approval: ask once whether Claude may edit files without asking each time.
+# Only ever sets permissions.defaultMode to "acceptEdits". Never any other mode.
+MJS='
+const fs = require("fs");
+let cur;
+try { cur = JSON.parse(fs.readFileSync(process.argv[1], "utf8").replace(/^﻿/, "")); } catch (e) { process.exit(3); }
+if (cur === null || typeof cur !== "object" || Array.isArray(cur)) process.exit(3);
+const p = cur.permissions;
+if (p !== undefined && (p === null || typeof p !== "object" || Array.isArray(p))) process.exit(3);
+if (process.argv[2] === "get") {
+  if (p !== undefined && p.defaultMode !== undefined && p.defaultMode !== null) { console.log(String(p.defaultMode)); process.exit(0); }
+  process.exit(5);
+}
+if (p === undefined) cur.permissions = {};
+cur.permissions.defaultMode = "acceptEdits";
+fs.writeFileSync(process.argv[1], JSON.stringify(cur, null, 2) + "\n");
+'
+MPY='
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8-sig") as f:
+        cur = json.load(f)
+except Exception:
+    sys.exit(3)
+if not isinstance(cur, dict):
+    sys.exit(3)
+perm = cur.get("permissions")
+if "permissions" in cur and not isinstance(perm, dict):
+    sys.exit(3)
+if sys.argv[2] == "get":
+    if perm is not None and perm.get("defaultMode") is not None:
+        print(perm["defaultMode"])
+        sys.exit(0)
+    sys.exit(5)
+if perm is None:
+    perm = cur["permissions"] = {}
+perm["defaultMode"] = "acceptEdits"
+with open(sys.argv[1], "w", encoding="utf-8") as f:
+    json.dump(cur, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+'
+# json_mode get|set : exit 0 ok, 3 invalid JSON, 5 (get) not set, 99 no node or python3
+json_mode() {
+  if command -v node >/dev/null 2>&1 && node -e '0' >/dev/null 2>&1; then
+    node -e "$MJS" "$SET" "$1"
+  elif command -v python3 >/dev/null 2>&1 && python3 -c 'import json' >/dev/null 2>&1; then
+    python3 -c "$MPY" "$SET" "$1"
+  else
+    return 99
+  fi
+}
+edits_by_hand() {
+  say "      To allow edits without asking, add \"defaultMode\": \"acceptEdits\" inside \"permissions\" in .claude/settings.json by hand."
+}
+mode_rc=0
+cur_mode=""
+if [ ! -f "$SET" ]; then
+  mode_rc=98
+else
+  cur_mode=$(json_mode get) || mode_rc=$?
+fi
+case "$mode_rc" in
+  0) say "skipped: edit approval is already set to $cur_mode" ;;
+  5)
+    answer="$ACCEPT"
+    if [ "$answer" = ask ]; then
+      # Read from the terminal, not stdin, so it also works when the script is piped.
+      if { : </dev/tty; } 2>/dev/null; then
+        say "Claude's builders write and change files in this folder while they work."
+        say "Let them do that without asking you each time? Runs can then finish while you are away."
+        say "You can change this later in .claude/settings.json."
+        printf '%s ' "Allow edits without asking? [y/N]"
+        reply=""
+        IFS= read -r reply </dev/tty || reply=""
+        reply=$(printf '%s' "$reply" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        case "$reply" in
+          y|Y|yes|Yes|YES) answer=yes ;;
+          *) answer=no ;;
+        esac
+      else
+        answer=none
+      fi
+    fi
+    case "$answer" in
+      yes)
+        if json_mode set; then
+          changed; say "ok: Claude can edit files in this folder without asking (acceptEdits)"
+        else
+          say "NOTE: could not update .claude/settings.json, so I left it alone."
+          edits_by_hand
+        fi ;;
+      no) say "ok: Claude will ask before each file edit. To change later, run this installer again with --accept-edits" ;;
+      *) say "skipped: no terminal to ask on. To allow edits without asking, run this installer again with --accept-edits" ;;
+    esac ;;
+  3) say "NOTE: .claude/settings.json is not valid JSON, so I left edit approval alone."
+     edits_by_hand ;;
+  98) say "skipped: there is no .claude/settings.json to change."
+     edits_by_hand ;;
+  *) say "NOTE: I need node or python3 to change .claude/settings.json, so I left edit approval alone."
+     edits_by_hand ;;
+esac
 
 # 5. .gitignore
 GI="$DEST/.gitignore"

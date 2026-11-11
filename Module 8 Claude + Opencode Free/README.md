@@ -49,11 +49,14 @@ powershell -ExecutionPolicy Bypass -File module-8\install.ps1
 ```
 It prints one line per step. Running it again is safe: it changes nothing the second time.
 
+The installer asks one question: may Claude edit files in this folder without asking each time? Answer `y` for runs you can leave alone, or `n` to approve each edit yourself. To answer yes up front, add `--accept-edits` to the Mac command or `-AcceptEdits` to the Windows command. You can change it later in `.claude/settings.json`.
+
 **What it does**
 - Copies the 5 agents to `.claude/agents/` and the 4 rule files to `.claude/m8/`.
 - Copies `scripts/opencode-run.sh` and makes it runnable.
 - Copies `CLAUDE.md` and `AGENTS.md`. If you already have your own, it does not overwrite them: it saves the new text as `CLAUDE.module-8.md` and tells you to paste it in. An older Module 8 copy is backed up and replaced.
 - Adds the approvals list to `.claude/settings.json` (merged, your other settings stay).
+- Asks the one edit question described above and, only if you say yes, sets `"defaultMode": "acceptEdits"` in that file.
 - Adds two lines to `.gitignore` (`.claude/opencode-quota/` and `.m8/`).
 - Starts git and makes a first commit if the folder has none. It never touches your `.env` files.
 - Checks that `opencode` is installed and tells you how to get it if not.
@@ -86,6 +89,7 @@ Copy-Item module-8\settings.json .claude\settings.json
 Add-Content .gitignore ".claude/opencode-quota/", ".m8/"
 ```
 Already have a `CLAUDE.md`, `AGENTS.md` or `.claude/settings.json`? Do not overwrite them: paste the new text into your file. Not using git yet? The review step reads `git diff`, so run `git init && git add -A && git commit -m "start"` once.
+Want Claude to edit files here without asking each time? Add `"defaultMode": "acceptEdits"` inside `"permissions"` in `.claude/settings.json`.
 </details>
 
 **Check it worked:** `ls -la .claude/agents .claude/m8 scripts`. You should see:
@@ -108,7 +112,7 @@ scripts/opencode-run.sh --status --role build
 You should see `ok`, then a line like `role build: 0 of 7 models limited`. Then run the test prompt in `module-8/test-prompt.md`.
 
 ## Approvals
-The installer adds an allow-list to `.claude/settings.json`: the runner script, read-only git commands and the `.m8/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. If a free model stalls waiting for a permission, allow that specific tool in `opencode.json`. Never add `--auto`.
+The installer adds an allow-list to `.claude/settings.json`: the runner script, read-only git commands and the `.m8/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. The installer also asks one question: may Claude edit files in this folder without asking each time? Yes sets `"defaultMode": "acceptEdits"` in that file (`--accept-edits` on Mac or `-AcceptEdits` on Windows answers yes up front); no leaves every edit asking as usual. If a free model stalls waiting for a permission, allow that specific tool in `opencode.json`. Never add `--auto`.
 
 ## The run folder `.m8/`
 Everything Claude writes during a run lives in `.m8/` in your project (git-ignored): `briefs/<task>.md` (the task briefs), `logs/` (the script's scratch files), `contract.md` (shared names that later tasks must use), `TASKS.md` (one line per task) and `last-run.md` (the full table of the last run). The script does not use `/tmp`.

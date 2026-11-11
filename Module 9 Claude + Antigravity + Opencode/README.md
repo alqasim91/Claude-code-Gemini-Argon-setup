@@ -61,11 +61,14 @@ powershell -ExecutionPolicy Bypass -File module-9\install.ps1
 ```
 It prints one line per step. Running it again is safe: it changes nothing the second time.
 
+The installer asks one question: may Claude edit files in this folder without asking each time? Answer `y` for runs you can leave alone, or `n` to approve each edit yourself. To answer yes up front, add `--accept-edits` to the Mac command or `-AcceptEdits` to the Windows command. You can change it later in `.claude/settings.json`.
+
 **What it does**
 - Copies the 7 agents to `.claude/agents/` and the rule files to `.claude/m9/`.
 - Copies `scripts/agy-run.sh` and `scripts/opencode-run.sh` and makes them runnable.
 - Copies `CLAUDE.md` and `AGENTS.md`. If you already have your own, it does not overwrite them: it saves the new text as `CLAUDE.module-9.md` and tells you to paste it in. An older Module 9 copy is backed up and replaced.
 - Adds the approvals list to `.claude/settings.json` (merged, your other settings stay).
+- Asks the one edit question described above and, only if you say yes, sets `"defaultMode": "acceptEdits"` in that file.
 - Adds three lines to `.gitignore`.
 - Starts git and makes a first commit if the folder has none. It never touches your `.env` files.
 - Checks that `agy` and `opencode` are installed and tells you how to get them if not.
@@ -98,6 +101,7 @@ Copy-Item module-9\settings.json .claude\settings.json
 Add-Content .gitignore ".claude/agy-quota/", ".claude/opencode-quota/", ".m9/"
 ```
 Already have a `CLAUDE.md`, `AGENTS.md` or `.claude/settings.json`? Do not overwrite them: paste the new text into your file. Not using git yet? The review step reads `git diff`, so run `git init && git add -A && git commit -m "start"` once.
+Want Claude to edit files here without asking each time? Add `"defaultMode": "acceptEdits"` inside `"permissions"` in `.claude/settings.json`.
 </details>
 
 **Check it worked:** `ls -la .claude/agents .claude/m9 scripts`. You should see:
@@ -122,7 +126,7 @@ scripts/opencode-run.sh --status --role build
 Then run a prompt from `module-9/test-prompt.md`.
 
 ## Approvals
-The installer adds an allow-list to `.claude/settings.json`: the two runner scripts, read-only git commands and the `.m9/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. Never add `--auto` or `--dangerously-skip-permissions`.
+The installer adds an allow-list to `.claude/settings.json`: the two runner scripts, read-only git commands and the `.m9/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. The installer also asks one question: may Claude edit files in this folder without asking each time? Yes sets `"defaultMode": "acceptEdits"` in that file (`--accept-edits` on Mac or `-AcceptEdits` on Windows answers yes up front); no leaves every edit asking as usual. Never add `--auto` or `--dangerously-skip-permissions`.
 
 # Part 2: How it works
 
