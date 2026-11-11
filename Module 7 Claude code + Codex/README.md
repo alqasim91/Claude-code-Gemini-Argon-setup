@@ -42,7 +42,7 @@ Look for `-m` (model), `-c` (config override), `--sandbox` and `-o` (output file
 **Easiest: let Claude Code set it up**
 
 1. Put `module-7-files.zip` in your project folder.
-2. Open Claude Code in that folder. Desktop app: **New session**, then pick the folder. Terminal: type `claude` in the folder.
+2. Open the Claude desktop app. Click **New session** and pick your project folder.
 3. Paste this line:
    ```
    Unzip module-7-files.zip in this folder, then read module-7/SETUP.md and follow it.

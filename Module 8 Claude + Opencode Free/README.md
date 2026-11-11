@@ -43,7 +43,7 @@ This module uses `-m`, `--variant`, `--dir`, `--agent`. They are confirmed on yo
 **Easiest: let Claude Code set it up**
 
 1. Put `module-8-files.zip` in your project folder.
-2. Open Claude Code in that folder. Desktop app: **New session**, then pick the folder. Terminal: type `claude` in the folder.
+2. Open the Claude desktop app. Click **New session** and pick your project folder.
 3. Paste this line:
    ```
    Unzip module-8-files.zip in this folder, then read module-8/SETUP.md and follow it.

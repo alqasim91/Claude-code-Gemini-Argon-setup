@@ -55,7 +55,7 @@ Then `opencode models opencode`. The free ones end in `-free` (plus `big-pickle`
 **Easiest: let Claude Code set it up**
 
 1. Put `module-9-files.zip` in your project folder.
-2. Open Claude Code in that folder. Desktop app: **New session**, then pick the folder. Terminal: type `claude` in the folder.
+2. Open the Claude desktop app. Click **New session** and pick your project folder.
 3. Paste this line:
    ```
    Unzip module-9-files.zip in this folder, then read module-9/SETUP.md and follow it.
