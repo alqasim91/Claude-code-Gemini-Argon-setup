@@ -6,6 +6,8 @@ What changed from Module 6: `agy` is replaced by Codex. There is no relay subage
 
 # Part 1: Setup
 
+Short on time? Skip to Step 4 (Install the files): Claude Code can do most of this for you.
+
 Do the steps in order. Each step shows **Mac** (Terminal) and **Windows** (PowerShell).
 
 ## Step 1. Get a ChatGPT plan that includes Codex
@@ -35,53 +37,79 @@ codex exec --help
 ```
 Look for `-m` (model), `-c` (config override), `--sandbox` and `-o` (output file). The flags come from third-party docs. If a name differs, edit the variables at the top of `scripts/codex-run.sh`.
 
-## Step 4. Copy the files into your project
-Unzip `module-7-files.zip` so the `module-7` folder sits **inside your project folder**. Open a terminal in the project folder.
+## Step 4. Install the files (one command)
 
-You are copying:
-- `CLAUDE.md` and `AGENTS.md` to the project root.
-- `agents/*.md` (5 files) to `.claude/agents/`.
-- `scripts/codex-run.sh` to `scripts/`, made executable.
-- A new `.claude/codex-quota/` folder, hidden from git.
+**Easiest: let Claude Code set it up**
+
+1. Put `module-7-files.zip` in your project folder.
+2. Open the Claude desktop app. Click **New session** and pick your project folder.
+3. Paste this line:
+   ```
+   Unzip module-7-files.zip in this folder, then read module-7/SETUP.md and follow it.
+   ```
+
+Claude Code unzips the files, asks you one question (may it edit files without asking each time), installs the module, checks the outside tools and tells you what is left. It will ask your approval for the first one or two commands; that is normal, the approvals list does not exist yet. Signing in to `codex` stays with you, because it opens a browser. When it finishes, start a new session and choose Opus.
+
+**Or run the installer yourself**
+
+Unzip `module-7-files.zip` **inside your project folder** (it creates a `module-7` folder). Open a terminal in the project folder. Run one command.
 
 **Mac**
 ```bash
-mkdir -p .claude/agents .claude/codex-quota scripts
-cp module-7/CLAUDE.md module-7/AGENTS.md .
-cp module-7/agents/*.md .claude/agents/
-cp module-7/scripts/codex-run.sh scripts/
-chmod +x scripts/codex-run.sh
-echo ".claude/codex-quota/" >> .gitignore
+bash module-7/install.sh
 ```
-Files already sitting in the project root (`CLAUDE.md`, `AGENTS.md`, `agents/`, `scripts/` next to each other, no `module-7` folder)? Use this instead. It moves the agents into `.claude/agents/` and removes the empty `agents` folder:
-```bash
-mkdir -p .claude/agents .claude/codex-quota
-mv agents/*.md .claude/agents/ && rmdir agents
-chmod +x scripts/codex-run.sh
-echo ".claude/codex-quota/" >> .gitignore
-```
-**Check it worked.** `.claude` is hidden in Finder (`Cmd+Shift+.` shows it). In Terminal:
-```bash
-ls -la .claude/agents scripts
-```
-You should see `claude-sonnet-builder.md`, `claude-opus-builder.md`, `claude-haiku-builder.md`, `sonnet-reviewer.md`, `scout.md` and an executable `codex-run.sh`. "No such file" means the terminal was not in the project folder.
-
 **Windows (PowerShell)**
 ```powershell
-New-Item -ItemType Directory -Force .claude\agents, .claude\codex-quota, scripts | Out-Null
+powershell -ExecutionPolicy Bypass -File module-7\install.ps1
+```
+It prints one line per step. Running it again is safe: it changes nothing the second time. The runner script is a bash script: on Windows run Claude Code from Git Bash or WSL.
+
+The installer asks one question: may Claude edit files in this folder without asking each time? Answer `y` for runs you can leave alone, or `n` to approve each edit yourself. To answer yes up front, add `--accept-edits` to the Mac command or `-AcceptEdits` to the Windows command. You can change it later in `.claude/settings.json`.
+
+**What it does**
+- Copies the 5 agents to `.claude/agents/` and the 4 rule files to `.claude/m7/`.
+- Copies `scripts/codex-run.sh` and makes it runnable.
+- Copies `CLAUDE.md` and `AGENTS.md`. If you already have your own, it does not overwrite them: it saves the new text as `CLAUDE.module-7.md` and tells you to paste it in. An older Module 7 copy is backed up and replaced.
+- Adds the approvals list to `.claude/settings.json` (merged, your other settings stay).
+- Asks the one edit question described above and, only if you say yes, sets `"defaultMode": "acceptEdits"` in that file.
+- Adds two lines to `.gitignore` (`.claude/codex-quota/` and `.m7/`).
+- Starts git and makes a first commit if the folder has none. It never touches your `.env` files.
+- Checks that `codex` is installed and tells you how to get it if not.
+
+<details>
+<summary>Manual install (only if you prefer to copy by hand)</summary>
+
+**Mac**
+```bash
+mkdir -p .claude/agents .claude/m7 .claude/codex-quota scripts
+cp module-7/CLAUDE.md module-7/AGENTS.md .
+cp module-7/agents/*.md .claude/agents/
+cp module-7/rules/*.md .claude/m7/
+cp module-7/scripts/codex-run.sh scripts/
+chmod +x scripts/codex-run.sh
+cp module-7/settings.json .claude/settings.json
+printf '.claude/codex-quota/\n.m7/\n' >> .gitignore
+git init && git add -A && git commit -m "start"
+```
+**Windows (PowerShell)**
+```powershell
+New-Item -ItemType Directory -Force .claude\agents, .claude\m7, .claude\codex-quota, scripts | Out-Null
 Copy-Item module-7\CLAUDE.md, module-7\AGENTS.md .
 Copy-Item module-7\agents\*.md .claude\agents\
+Copy-Item module-7\rules\*.md .claude\m7\
 Copy-Item module-7\scripts\codex-run.sh scripts\
-Add-Content .gitignore ".claude/codex-quota/"
+Copy-Item module-7\settings.json .claude\settings.json
+Add-Content .gitignore ".claude/codex-quota/", ".m7/"
 ```
-Files already in the project root (no `module-7` folder)? Use this instead:
-```powershell
-New-Item -ItemType Directory -Force .claude\agents, .claude\codex-quota | Out-Null
-Move-Item agents\*.md .claude\agents\
-Remove-Item agents
-Add-Content .gitignore ".claude/codex-quota/"
-```
-Already have a `CLAUDE.md` or `AGENTS.md`? Do not overwrite it. Paste the new text into your existing file instead.
+Already have a `CLAUDE.md`, `AGENTS.md` or `.claude/settings.json`? Do not overwrite them: paste the new text into your file. Not using git yet? The review step reads `git diff`, so run `git init && git add -A && git commit -m "start"` once.
+Want Claude to edit files here without asking each time? Add `"defaultMode": "acceptEdits"` inside `"permissions"` in `.claude/settings.json`.
+</details>
+
+**Check it worked:** `ls -la .claude/agents .claude/m7 scripts`. You should see:
+- 5 agents: `claude-sonnet-builder`, `claude-opus-builder`, `claude-haiku-builder`, `sonnet-reviewer`, `scout`.
+- 4 files in `.claude/m7/`: `codex-limits.md`, `fix-ladders.md`, `models.md`, `worktree.md`.
+- One executable script: `codex-run.sh`.
+"No such file" means the terminal was not in the project folder. `.claude` is hidden in Finder (`Cmd+Shift+.` shows it).
 
 ## Step 5. Make sure the folder is a git repo
 The review step reads `git diff`. Skip this if your project already uses git.
@@ -95,21 +123,13 @@ git commit -m "start"
 ```
 claude
 ```
-Type `/agents`. You should see `claude-sonnet-builder`, `claude-opus-builder`, `claude-haiku-builder`, `sonnet-reviewer` and `scout`. Not there? Quit, start again, re-check Step 4.
+Type `/agents`. You should see `claude-sonnet-builder`, `claude-opus-builder`, `claude-haiku-builder`, `sonnet-reviewer` and `scout`. Not there? Quit, start again, re-check Step 4. Also run `scripts/codex-run.sh --status`: it should print "no codex limit active".
 
 ## Step 7. Run the test prompt
 Open `module-7/test-prompt.md`, copy the prompt into Claude Code unchanged. Then use its "What to check" list.
 
-## If Claude Code blocks the script
-Optional: add an allow rule to `.claude/settings.json`.
-```json
-{
-  "permissions": {
-    "allow": ["Bash(scripts/codex-run.sh:*)"]
-  }
-}
-```
-The script never bypasses the Codex sandbox or approvals. Do not add flags that do.
+## Approvals
+The installer adds an allow-list to `.claude/settings.json`: the runner script, read-only git commands and the `.m7/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. The installer also asks one question: may Claude edit files in this folder without asking each time? Yes sets `"defaultMode": "acceptEdits"` in that file (`--accept-edits` on Mac or `-AcceptEdits` on Windows answers yes up front); no leaves every edit asking as usual. The script never bypasses the Codex sandbox or approvals. Do not add flags that do.
 
 # Part 2: How it works
 
@@ -158,7 +178,7 @@ Otherwise the first match wins:
 
 Unsure luna or sol? Sol. Unsure sol-medium or sol-high? Sol-medium, unless D = 2.
 
-Opus logs one line per task in `TASKS.md` (`ID | phase | route | score | reviewer | rounds | result | notes`), so you can tune the routing later.
+Opus logs one line per task in `.m7/TASKS.md` (`ID | phase | route | score | reviewer | rounds | result | notes`), so you can tune the routing later.
 
 ## A build in 5 beats
 ```
@@ -170,10 +190,11 @@ Opus logs one line per task in `TASKS.md` (`ID | phase | route | score | reviewe
       |
  4 REVIEW      each phase is reviewed and fixed before the next starts
       |
- 5 SUMMARY     one table: phase, task, score, model, limit hit (5h/weekly) -> what happened, reviewer, rounds, result
+ 5 SUMMARY     a few plain lines to you; the table (phase, task, score, model, limit hit, reviewer, rounds, result) goes to .m7/last-run.md
 ```
 - **Phases.** If your prompt is not phased, Opus phases it. Phase 0 is the foundation. Each later phase builds on the previous one. A multi-step phase is split into parallel tasks on separate files. A single-step phase is one job.
 - **One owner per file.** Two tasks never touch the same file in a phase.
+- **Shared names.** If tasks depend on shared names (functions, ids, classes), the foundation task writes them to `.m7/contract.md` and later briefs say "read it first". Nobody copies the list into briefs.
 - **Worktree mode** (optional, off by default) gives each task its own git worktree and a `codex/<task>` branch, for work that cannot be split into separate files.
 
 ## Who reviews
@@ -214,6 +235,10 @@ The Codex plan has TWO limits: a 5-hour limit and a weekly limit. Both are share
 - A hard (sol-high) task is never downgraded to luna or terra.
 
 # Part 3: Good to know
+
+- **Run folder.** `.m7/` holds the briefs (`briefs/`), the script's scratch files (`logs/`), the shared names file (`contract.md`), the task log (`TASKS.md`) and the detailed table of the last run (`last-run.md`). It is git-ignored and safe to delete between runs.
+- **The final message is short.** At most 8 plain lines. The per-phase table and the other details are in `.m7/last-run.md`.
+- **Rule files.** Rarely needed rules (Codex limits and Module 3 mode, fix ladder details, Claude agent table, worktree mode) live in `.claude/m7/`. Opus reads each one only when its trigger fires, which keeps every message cheaper. The one-line guards stay in `CLAUDE.md`.
 
 - **Parallel runs use up the shared limits faster.** Prefer fewer, bigger tasks.
 - **Default caps:** 3 tasks at once (sol 2, terra 2, luna 3). They limit parallel sessions, not quota. Claude builder runs count toward the total only. Edit the table in `CLAUDE.md`.

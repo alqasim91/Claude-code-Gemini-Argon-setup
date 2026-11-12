@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scripts/opencode-run.sh:*)",
+      "Bash(bash scripts/opencode-run.sh:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(date:*)",
+      "Bash(mkdir -p .m8:*)",
+      "Edit(.m8/**)",
+      "Write(.m8/**)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  }
+}

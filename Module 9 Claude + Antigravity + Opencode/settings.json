@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scripts/agy-run.sh:*)",
+      "Bash(bash scripts/agy-run.sh:*)",
+      "Bash(scripts/opencode-run.sh:*)",
+      "Bash(bash scripts/opencode-run.sh:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(date:*)",
+      "Bash(mkdir -p .m9:*)",
+      "Edit(.m9/**)",
+      "Write(.m9/**)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  }
+}

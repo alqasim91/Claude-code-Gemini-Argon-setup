@@ -57,16 +57,15 @@ Print: files created, whether the self-check passed, issues found and fixed, and
 
 ## What to look for
 
-- A plan table is printed first, before any work starts or any file is edited, with a route for every task (sensitive ones labeled `opus-sensitive (reason)`).
-- The main chat edits no project files and runs no builds: every edit, even sensitive work, comes from a sub-agent.
+- A plan table is printed first, before any work starts or any file is edited, with a route for every task (sensitive ones labeled `opus-sensitive (reason)`). `scripts/agy-run.sh --status` ran before it.
+- The main chat edits no project files and runs no builds: every edit, even sensitive work, comes from a sub-agent or a script run. It only launches them, writes files under `.m6/`, and reads short reports.
 - Sensitive means the sensitive files only (migrations, access policies, money or stock functions, auth, crypto) and those go to `claude-opus-builder`; the UI, types and labels of the same feature go through normal routing.
 - The design and styles task went to `claude-sonnet-builder` or `claude-opus-builder`, never to `agy` (not Argon, not Flash).
-- Parallel tasks were launched together in one message, and no two of them own the same file.
+- Parallel tasks were launched together in one message (agy builds as background `scripts/agy-run.sh` Bash calls, with briefs in `.m6/briefs/`; there is no relay sub-agent), and no two of them own the same file.
 - The scout checks (links, accessibility, leftover text) went to Flash, and Opus verified what they reported before anything was changed.
 - Every task that edits files got a reviewer sub-agent. Each build was reviewed by `sonnet-reviewer` when it had 400 changed lines or fewer. `opus-reviewer` (a sub-agent) reviewed it above 400, and the main chat never read a full diff.
-- A failed review went back to the same Antigravity model first, then to Claude Sonnet high, then Claude Opus medium.
-- A summary table is printed at the end, even if all the work went to one sub-agent.
-- Also check the printed "Elapsed: Xm Ys" line and the final per-wave summary.
+- A failed review went back to the same Antigravity model first (`--no-fallback`), then to Claude Sonnet high, then Claude Opus medium, and `.claude/m6/fix-ladders.md` was read first.
+- The final message to the user is at most 8 short lines (what was built, what is open, who did the work, what you must decide, "Details: .m6/last-run.md") plus the "Elapsed" line. The per-wave table is in `.m6/last-run.md`. A summary arrives even if all the work went to one sub-agent.
 
 ## Optional: test the drained question
 
@@ -74,7 +73,7 @@ Fake a drained Antigravity before you paste a prompt. In the project folder (Mac
 
 ```bash
 mkdir -p .claude/agy-quota
-for m in gemini-4-argon-medium gemini-4-argon-high claude-sonnet-5-5-medium claude-opus-5-5-medium; do date -u +%Y-%m-%dT%H:%M:%SZ > ".claude/agy-quota/$m"; done
+for m in gemini-4-argon-medium gemini-4-argon-high claude-sonnet-5-5-medium claude-opus-5-5-medium; do printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > ".claude/agy-quota/$m"; done
 ```
 
-Then paste Prompt A. Opus should still build the design shell with a Claude builder, then stop and ask ONE question: "a) switch to Flash, or b) switch to Module 3?" (or "wait for the reset, or switch to Module 3?" if it judges the work too big for Flash). It must not pick for you. Answer a) and check that each task is split into mini-tasks and reviewed once per task, after all its mini-tasks. Delete the marker files when you are done: `rm .claude/agy-quota/*`.
+Then paste Prompt A. Opus should still build the design shell with a Claude builder, then stop and ask ONE question: "a) switch to Flash, or b) switch to Module 3?" (or "wait for the reset, or switch to Module 3?" if it judges the work too big for Flash). It must not pick for you. Answer a) and check that each task is split into mini-tasks and reviewed once per task, after all its mini-tasks. `scripts/agy-run.sh --status` should list the four markers, and `.claude/m6/drained-builders.md` should have been read before the question. Delete the marker files when you are done: `rm .claude/agy-quota/*`.
