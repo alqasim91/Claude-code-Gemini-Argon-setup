@@ -1,12 +1,12 @@
 Read this only when choosing `--start`, judging a data-policy question beyond the Data rule in CLAUDE.md, or editing chains. Reference only: the script is the source of truth for chains (`chain_for` in `scripts/opencode-run.sh`), and it now discovers which free models are offered and skips missing ones itself. Cross-rules: S = 2 never goes to a free model; `--private` keeps only zero-retention models.
 
-IDs confirmed from `agy models` (agy IDs incl. Hydrogen, 2026-11; Antigravity IDs 2026-10-25) and `opencode models opencode --verbose` (2026-11-04).
+IDs confirmed from `agy models`: Hydrogen IDs (`gemini-4-hydrogen-low`, `-medium`, `-high`, `-xhigh`) confirmed from the user's `agy models` on 2026-11-13, other Antigravity IDs 2026-10-25. Real runs on the real tool are not done yet. OpenCode IDs from `opencode models opencode --verbose` (2026-11-04).
 
 # Antigravity models (through `scripts/agy-run.sh`, on the Google AI Pro plan)
 
 | Alias | agy model ID | Use for | Quota notes |
 |---|---|---|---|
-| hydrogen (= hydrogen-high) | `gemini-4-hydrogen-high` (`hydrogen-medium`, `-low`, `-xhigh` selectable) | **Default builder.** Exact mini-tasks AND non-exact bulk work (docs, copy, standard logic, tests); fix steps. Needs a real `owns:` list. Never design, review or hard tasks. Fast and cheaper than Argon, weaker on terminal and long-horizon work | Own marker per ID. May share a Google "Gemini Models" quota with Argon and Flash (unverified) |
+| hydrogen (= hydrogen-high) | `gemini-4-hydrogen-high` (`hydrogen-medium`, `-low`, `-xhigh` selectable) | **Default builder.** Exact mini-tasks AND non-exact bulk work (docs, copy, standard logic, tests); fix steps. Needs a real `owns:` list. Never design, review or hard tasks. Scored about the same as Argon on one index (secondary source, unverified); reported weaker on terminal and long-horizon work | Own marker per ID. May share one quota pool with Argon and Flash (unverified) |
 | argon | `gemini-4-argon-medium` (`argon-high` for the hardest, `argon-low` for trivial) | **Hard tasks only.** Fix steps (medium) | Small pool; weekly |
 | flash (scout) | `gemini-3.8-flash-medium` (`flash-low` = `-low` for pure lookups) | Scouting fallback after the OpenCode `scout` chain is drained. Read-only | Own marker |
 | flash-high (build) | `gemini-3.8-flash-high` | Last-resort exact-spec builder, only when Hydrogen and OpenCode `build` are both drained. Needs a real `owns:`. Never fixes, never reviews | Own marker |

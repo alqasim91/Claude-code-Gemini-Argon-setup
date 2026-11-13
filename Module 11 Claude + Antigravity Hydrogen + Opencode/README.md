@@ -1,7 +1,7 @@
 # Module 11: Claude plans, Antigravity Hydrogen builds, OpenCode free models take the overflow, Argon takes the hard tasks
 
 Claude Opus is the boss. It splits your request into phases and tasks and sends each task to the right pool:
-- **Antigravity Hydrogen** (`gemini-4-hydrogen-high`) is the default builder. It takes every task that splits into small, exact pieces and the bulk work that cannot be specced exactly (docs, copy, standard logic, tests). It is fast and cheaper than Argon.
+- **Antigravity Hydrogen** (`gemini-4-hydrogen-high`) is the default builder. It takes every task that splits into small, exact pieces and the bulk work that cannot be specced exactly (docs, copy, standard logic, tests). It scored about the same as Argon on one index (secondary source, unverified).
 - **OpenCode free models** are the overflow and fallback: they take Hydrogen's work silently when Hydrogen runs dry, and they handle scouting, image/audio/large-context work.
 - **Argon** (Antigravity) only takes hard tasks, and a step in the fix rounds. **agy Sonnet and agy Opus** take fix rounds only. **Flash** is now only a scout fallback and a last-resort builder.
 - **Your Claude plan** does design, sensitive work, every review, and fix steps when agy Sonnet or Opus is drained.
@@ -28,7 +28,7 @@ You only use the Claude desktop app. Claude does the setup for you.
    Unzip module-11-files.zip in this folder, then read module-11/SETUP.md and follow it.
    ```
 
-Claude unzips the files, asks you one question (may it edit files without asking each time), installs the module, installs `agy` and `opencode` if they are missing (it asks first), checks them and tells you what is left. It will ask your approval for the first one or two commands; that is normal, the approvals list does not exist yet. Signing in to Antigravity with your Google account happens in your browser; Claude starts it and tells you when to finish it. OpenCode needs no sign-in. When it finishes, start a new session and choose Opus.
+Claude unzips the files, asks you one question (may it edit files without asking each time), installs the module, installs `agy` and `opencode` if they are missing (it asks first), checks them and tells you what is left. It will ask your approval for the first one or two commands; that is normal, the approvals list does not exist yet. Signing in to Antigravity with your Google account happens in your browser; Claude starts it and tells you when to finish it (if no browser opens, Claude asks you to sign in in the Antigravity app). OpenCode free models need no sign-in. When it finishes, start a new session and choose Opus.
 
 **What the setup does**
 - Copies the 7 agents to `.claude/agents/` and the rule files to `.claude/m11/`.
@@ -36,6 +36,8 @@ Claude unzips the files, asks you one question (may it edit files without asking
 - Copies `CLAUDE.md` and `AGENTS.md`. If you already have your own, it does not overwrite them: it saves the new text as `CLAUDE.module-11.md` and Claude asks whether to put it at the top of your file. An older Module 11 copy is backed up and replaced.
 - Adds the approvals list to `.claude/settings.json` (merged, your other settings stay). If you say yes to the edit question, it also sets `"defaultMode": "acceptEdits"` there.
 - Adds three lines to `.gitignore`. Starts git and makes a first commit if the folder has none. It never touches your `.env` files.
+
+**The installer command (Claude runs it for you, you do not type it).** On Mac, Linux or Git Bash: `bash module-11/install.sh`. On Windows without bash: `powershell -ExecutionPolicy Bypass -File module-11\install.ps1`. Adding `--accept-edits` (Windows: `-AcceptEdits`) answers the edit question with yes, `--no-accept-edits` (`-NoAcceptEdits`) with no. Running it again is safe: it changes nothing the second time.
 
 Both `agy` and `opencode` read `AGENTS.md`, which is how the other models get the rules.
 
@@ -71,10 +73,10 @@ The setup adds an allow-list to `.claude/settings.json`: the two runner scripts,
 | Terminal-Bench 4.0 | 54% | 57.1% | n/a | 64% |
 | Role here | default builder | hard tasks, fix step | scout fallback, last-resort builder | design, reviews, fixes |
 
-Hydrogen is a fast-execution model: a little stronger than Argon on the index, cheaper and faster, but weaker on terminal and long-horizon work, which is why hard tasks stay with Argon. Hydrogen costs $1.50 per million input tokens and $7.50 per million output tokens. These figures are secondary and unverified (third-party indexes and press numbers); do not rely on them for anything that matters.
+Hydrogen scored about the same as Argon on one index (secondary source, unverified) and is reported weaker on terminal and long-horizon work, which is why hard tasks stay with Argon. Hydrogen costs $1.50 per million input tokens and $7.50 per million output tokens. These figures are secondary and unverified (third-party indexes and press numbers); do not rely on them for anything that matters.
 
 ## Quota is separate per model
-Each model ID has its own marker (`.claude/agy-quota/<model-id>`, for example `gemini-4-hydrogen-high`, and `.claude/opencode-quota/`). Google's docs put Hydrogen, Argon and Flash in one "Gemini Models" quota pool, so Hydrogen may share quota with Argon and Flash: heavy Hydrogen use could drain Argon too. That is not verified. The module tracks each ID separately and falls back by what the script reports.
+Each model ID has its own marker (`.claude/agy-quota/<model-id>`, for example `gemini-4-hydrogen-high`, and `.claude/opencode-quota/`). Hydrogen, Argon and Flash may share one quota pool (unverified), so heavy Hydrogen use could drain Argon too. The module tracks each ID separately and falls back by what the script reports.
 - Check any time: `scripts/agy-run.sh --status` and `scripts/opencode-run.sh --status --role build`.
 - Delete a marker file to clear it by hand.
 - An agy marker holds a reset time. If the tool gives none, the script uses 6 hours from now (a guess).
@@ -114,7 +116,7 @@ One review per task (after all its mini-tasks). No agy or OpenCode model reviews
 A drained agy Sonnet or Opus step is replaced by Claude Sonnet or Opus of the same tier. A drained or tripped Hydrogen, Argon or OpenCode step is skipped (with Hydrogen skipped, the OpenCode row is the four steps of Module 9). Argon is a fix step only; Argon high is never used for fixes. Design, sensitive and tiny-edit fixes stay on Claude. Still failing after the last step: recorded in the summary.
 
 ## Safety switches
-Opus tallies first-review failures per pool (Hydrogen, OpenCode). From the 3rd reviewed task, more than 1 in 3 failing trips that pool for the rest of the run. Hydrogen tripped: its work goes to OpenCode `build`. OpenCode tripped: it takes no new builds (they stay on Hydrogen). A tripped pool with the other one unavailable: Argon medium, then Flash for exact pieces only, then the question below. There is no switch for Flash, which is only a rare last resort.
+Opus tallies first-review failures per pool (Hydrogen, OpenCode). From the 3rd reviewed task, more than 1 in 3 failing trips that pool for the rest of the run. Hydrogen tripped: its work goes to OpenCode `build`. OpenCode tripped: it takes no new builds (they stay on Hydrogen). A tripped pool with the other one unavailable: Argon medium, then Flash high for exact pieces only, then held (the question below). There is no switch for Flash, which is only a rare last resort.
 
 ## When pools are drained
 Fallbacks between pools are silent. A task is held only when every pool that may take it is drained (for builds: Hydrogen, OpenCode and, for exact pieces, Flash). Opus then asks once: "Free pools are drained for <tasks>. Wait for the reset, or switch the held tasks to Module 3?" Nothing runs on Claude for build work until you answer. Module 3 mode is Claude only: scout, Haiku, Sonnet, Opus by the same scores, 800-line review rule.
@@ -130,4 +132,4 @@ Fallbacks between pools are silent. A task is held only when every pool that may
 - **Free models can say "done" and change nothing.** The script prints `changed lines (owned)`; 0 on a build task is a failure.
 - **Edit the tables.** Routing and caps live in `CLAUDE.md`. The preferred order of the free models lives in `chain_for` at the top of `scripts/opencode-run.sh`.
 - **Review every diff.** File ownership is enforced by instructions, not by the filesystem.
-- **Known unknowns:** nothing in this module has been run on the real tools yet. Module 9 had one real run (a landing-site test, only Flash and Claude Sonnet took part). The Hydrogen route, the OpenCode route, Argon, the fix ladders and the drained-pool paths are tested only against stand-in tools. Exact quota wording and reset times, whether Hydrogen shares one quota with Argon and Flash, whether `opencode run` exits non-zero on a limit, whether `--agent plan` is read-only, concurrency caps, and model benchmarks and prices (third-party or vendor-reported) are unconfirmed.
+- **Known unknowns:** nothing in this module has been run on the real tools yet. Module 9 had one real run (a landing-site test, only Flash and Claude Sonnet took part). The Hydrogen route, the OpenCode route, Argon, the fix ladders and the drained-pool paths are tested only against stand-in tools. Whether starting `agy` from Claude opens the browser sign-in page (the sign-in step in `SETUP.md` is untried; fallback: sign in in the Antigravity app), exact quota wording and reset times, whether Hydrogen shares one quota with Argon and Flash, whether `opencode run` exits non-zero on a limit, whether `--agent plan` is read-only, concurrency caps, and model benchmarks and prices (third-party or vendor-reported) are unconfirmed.

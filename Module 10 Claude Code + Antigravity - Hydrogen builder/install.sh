@@ -331,6 +331,6 @@ say ""
 say "Module 10 Hydrogen builder is installed."
 if [ "$CHANGED" = 0 ]; then say "Nothing changed this time. It was already up to date."; fi
 say "Next:"
-say "  1. Sign in to agy if you have not yet (run agy once)."
-say "  2. Start Claude Code in this folder and choose Opus."
+say "  1. Sign in to Antigravity with your Google AI Pro account if you have not yet (Claude tells you when it needs you to)."
+say "  2. Start a new session in the Claude desktop app, in this folder, and choose Opus."
 say "  3. Paste a prompt from test-prompt.md."

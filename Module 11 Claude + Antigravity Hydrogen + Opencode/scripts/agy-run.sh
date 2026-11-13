@@ -7,7 +7,7 @@
 #   scripts/agy-run.sh --status
 #
 # Aliases -> agy model ids (edit alias_id below and CLAUDE.md together):
-#   hydrogen        -> gemini-4-hydrogen-high    DEFAULT BUILDER (fast execution). --owns none is refused
+#   hydrogen        -> gemini-4-hydrogen-high    DEFAULT BUILDER. --owns none is refused
 #   hydrogen-high   -> gemini-4-hydrogen-high    same as hydrogen
 #   hydrogen-medium -> gemini-4-hydrogen-medium  builds, lighter effort
 #   hydrogen-low    -> gemini-4-hydrogen-low     builds, trivial work
@@ -167,7 +167,8 @@ case "$MODEL" in
   hydrogen|hydrogen-*)
     [ $READONLY -eq 0 ] || die "refused: $MODEL builds need a real --owns list (use OpenCode scout or flash for read-only scouting)" ;;
   flash-high)
-    [ $READONLY -eq 0 ] || die "refused: flash-high builds need a real --owns list (use flash for read-only scouting)" ;;
+    [ $READONLY -eq 0 ] || die "refused: flash-high builds need a real --owns list (use flash for read-only scouting)"
+    if [[ "$TASK" =~ -r[1-9]$ ]]; then die "refused: Flash never fixes or reviews (slug $TASK looks like a fix round)"; fi ;;
   flash|flash-low)
     [ $READONLY -eq 1 ] || die "refused: $MODEL is read-only scouting, --owns must be none" ;;
   sonnet|opus)

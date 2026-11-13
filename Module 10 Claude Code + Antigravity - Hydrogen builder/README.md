@@ -1,7 +1,7 @@
 # Module 10: Claude Code + Antigravity, Hydrogen builder
 
-**How this differs from Module 6 (Flash builder):** Gemini 4 Hydrogen (high) builds every non-design task, whether Opus can split it into exact mini-tasks or not. Argon is kept for hard tasks and takes over if Hydrogen keeps failing review. Flash scouts (read-only) and is the build fallback when Hydrogen is drained. Hydrogen is fast and cheap and scores about like Argon on general and agentic work, but it is weaker on terminal and long-horizon tasks.
-Not sure which module to use? Pick this one if you have Hydrogen in `agy models`. Pick Module 6 (Flash builder) if you do not.
+**How this differs from Module 6 (Flash builder):** Gemini 4 Hydrogen (high) builds every non-design task, whether Opus can split it into exact mini-tasks or not. Argon is kept for hard tasks and takes over if Hydrogen keeps failing review. Flash scouts (read-only) and is the build fallback when Hydrogen is drained. Hydrogen scored about the same as Argon on one index (secondary source, unverified) and is reported as weaker on terminal and long-horizon tasks.
+Not sure which module to use? Pick this one if Hydrogen is in your Antigravity model list. Pick Module 6 (Flash builder) if you do not.
 
 Claude Opus is the boss. It splits your request into tasks, and each task into small mini-tasks when it can write an exact spec for every piece. Builds go out through the Antigravity CLI (`agy`), straight from a script (`scripts/agy-run.sh`) with no helper agent in between, and run at the same time. Launching an Antigravity model costs no Claude usage. Design, reviews and the later fix steps stay on your Claude plan.
 
@@ -18,49 +18,13 @@ Secondary and unverified: these numbers come from third-party benchmark pages an
 
 # Part 1: Setup
 
-Short on time? Skip to Step 4 (Install the files): Claude Code can do most of this for you.
-
-Do the steps in order. Each step shows **Mac** (Terminal) and **Windows** (PowerShell).
+You only use the Claude desktop app. Claude does the setup for you.
 
 ## Step 1. Get your two plans
-- **Google AI Pro**: subscribe with the Google account you will use for `agy`. Your Antigravity builders run on this plan.
-- **Claude Pro**: the plan you already use to sign in to Claude Code. Design, reviews and fixes run on it.
+- **Google AI Pro**: subscribe with the Google account you will use for Antigravity. Your Antigravity builders run on this plan.
+- **Claude Pro**: the plan you already use for Claude. Design, reviews and fixes run on it.
 
-## Step 2. Install `agy`
-**Mac**
-```bash
-curl -fsSL https://antigravity.google/cli/install.sh | bash
-agy --version
-```
-**Windows (PowerShell)**
-```powershell
-irm https://antigravity.google/cli/install.ps1 | iex
-agy --version
-```
-You should see a version number. If the command is not found, close the terminal, open a new one, and try again.
-
-## Step 3. Log in
-```
-agy
-```
-1. Choose **Google OAuth**.
-2. Sign in with your AI Pro account in the browser.
-3. Quit `agy`, then check your models:
-```
-agy models
-```
-Make sure these six are in the list (the full list also has `-low`, `-medium`, `-high` and, for Hydrogen, `-xhigh` variants):
-- `gemini-4-hydrogen-high` (default builder)
-- `gemini-4-argon-medium`
-- `gemini-3.8-flash-high`
-- `gemini-3.8-flash-medium`
-- `claude-sonnet-5-5-medium`
-- `claude-opus-5-5-medium`
-
-## Step 4. Install the files (one command)
-
-**Easiest: let Claude Code set it up**
-
+## Step 2. Let Claude set it up
 1. Put `module-10-files.zip` in your project folder.
 2. Open the Claude desktop app. Click **New session** and pick your project folder.
 3. Paste this line:
@@ -68,84 +32,23 @@ Make sure these six are in the list (the full list also has `-low`, `-medium`, `
    Unzip module-10-files.zip in this folder, then read module-10/SETUP.md and follow it.
    ```
 
-Claude Code unzips the files, asks you one question (may it edit files without asking each time), installs the module, checks the outside tools and tells you what is left. It will ask your approval for the first one or two commands; that is normal, the approvals list does not exist yet. Signing in to `agy` stays with you, because it opens a browser. When it finishes, start a new session and choose Opus.
+Claude unzips the files, asks you one question (may it edit files without asking each time), installs the module, installs `agy` if it is missing (it asks first), checks it and tells you what is left. It will ask your approval for the first one or two commands; that is normal, the approvals list does not exist yet. Signing in to Antigravity with your Google account happens in your browser; Claude starts it and tells you when to finish it. When it finishes, start a new session and choose Opus.
 
-**Or run the installer yourself**
+**The installer command (Claude runs it for you, you do not type it).** On Mac, Linux or Git Bash: `bash module-10/install.sh`. On Windows without bash: `powershell -ExecutionPolicy Bypass -File module-10\install.ps1`. Adding `--accept-edits` (Windows: `-AcceptEdits`) answers the edit question with yes, `--no-accept-edits` (`-NoAcceptEdits`) with no. Running it again is safe: it changes nothing the second time.
 
-Unzip `module-10-files.zip` **inside your project folder** (it creates a `module-10` folder). Open a terminal in the project folder. Run one command.
-
-**Mac**
-```bash
-bash module-10/install.sh
-```
-**Windows (PowerShell)**
-```powershell
-powershell -ExecutionPolicy Bypass -File module-10\install.ps1
-```
-It prints one line per step. Running it again is safe: it changes nothing the second time.
-
-The installer asks one question: may Claude edit files in this folder without asking each time? Answer `y` for runs you can leave alone, or `n` to approve each edit yourself. To answer yes up front, add `--accept-edits` to the Mac command or `-AcceptEdits` to the Windows command. You can change it later in `.claude/settings.json`.
-
-**What it does**
+**What the setup does**
 - Copies the 7 agents to `.claude/agents/` and the 5 rule files to `.claude/m10/`.
 - Copies `scripts/agy-run.sh` and makes it runnable.
-- Copies `CLAUDE.md` and `AGENTS.md`. If you already have your own, it does not overwrite them: it saves the new text as `CLAUDE.module-10.md` and tells you to paste it in. An older Module 10 Hydrogen builder copy is backed up and replaced.
-- Adds the approvals list to `.claude/settings.json` (merged, your other settings stay).
-- Asks the one edit question described above and, only if you say yes, sets `"defaultMode": "acceptEdits"` in that file.
+- Copies `CLAUDE.md` and `AGENTS.md`. If you already have your own, it does not overwrite them: it saves the new text as `CLAUDE.module-10.md` and Claude asks whether to put it at the top of your file. An older Module 10 Hydrogen builder copy is backed up and replaced.
+- Adds the approvals list to `.claude/settings.json` (merged, your other settings stay). If you say yes to the edit question, it also sets `"defaultMode": "acceptEdits"` there.
 - Adds two lines to `.gitignore` (`.claude/agy-quota/` and `.m10/`).
 - Starts git and makes a first commit if the folder has none. It never touches your `.env` files.
-- Checks that `agy` is installed and tells you how to get it if not.
+- Checks that `agy` is installed and offers to install it if not.
 
-<details>
-<summary>Manual install (only if you prefer to copy by hand)</summary>
+`agy` should list these six models (the full list also has `-low`, `-medium`, `-high` and, for Hydrogen, `-xhigh` variants): `gemini-4-hydrogen-high` (default builder), `gemini-4-argon-medium`, `gemini-3.8-flash-high`, `gemini-3.8-flash-medium`, `claude-sonnet-5-5-medium`, `claude-opus-5-5-medium`. Claude checks this and tells you in plain words if one is missing.
 
-**Mac**
-```bash
-mkdir -p .claude/agents .claude/m10 .claude/agy-quota scripts
-cp module-10/CLAUDE.md module-10/AGENTS.md .
-cp module-10/agents/*.md .claude/agents/
-cp module-10/rules/*.md .claude/m10/
-cp module-10/scripts/agy-run.sh scripts/
-chmod +x scripts/agy-run.sh
-cp module-10/settings.json .claude/settings.json
-printf '.claude/agy-quota/\n.m10/\n' >> .gitignore
-git init && git add -A && git commit -m "start"
-```
-**Windows (PowerShell)**
-```powershell
-New-Item -ItemType Directory -Force .claude\agents, .claude\m10, .claude\agy-quota, scripts | Out-Null
-Copy-Item module-10\CLAUDE.md, module-10\AGENTS.md .
-Copy-Item module-10\agents\*.md .claude\agents\
-Copy-Item module-10\rules\*.md .claude\m10\
-Copy-Item module-10\scripts\agy-run.sh scripts\
-Copy-Item module-10\settings.json .claude\settings.json
-Add-Content .gitignore ".claude/agy-quota/", ".m10/"
-```
-Already have a `CLAUDE.md`, `AGENTS.md` or `.claude/settings.json`? Do not overwrite them: paste the new text into your file. Not using git yet? The review step reads `git diff`, so run `git init && git add -A && git commit -m "start"` once.
-Want Claude to edit files here without asking each time? Add `"defaultMode": "acceptEdits"` inside `"permissions"` in `.claude/settings.json`.
-</details>
-
-**Check it worked:** `ls -la .claude/agents .claude/m10 scripts`. You should see:
-- 7 agents: `claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer`, `claude-haiku-builder`, `scout`, `sonnet-reviewer`, `opus-reviewer`.
-- 5 files in `.claude/m10/`: `fix-ladders.md`, `drained-pools.md`, `safety-switch.md`, `worktree.md`, `models.md`.
-- One executable script: `agy-run.sh`.
-
-`.claude` is hidden, so Finder won't show it (press `Cmd+Shift+.` to show hidden files). "No such file" means the terminal was not in the project folder: run `cd ` (with a space), drag the project folder into Terminal, press Enter, and run the commands again.
-
-## Step 5. Start Claude Code and check the agents
-```
-claude
-```
-Inside Claude Code, type `/agents`. You should see the 7 agents: `claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer`, `claude-haiku-builder`, `scout`, `sonnet-reviewer` and `opus-reviewer`. Not there? Quit `claude`, start it again, and re-check Step 4. Then check the script can see its quota markers:
-```
-scripts/agy-run.sh --status
-```
-It should print `agy: 0 models limited`.
-
-## Step 6. Run a test prompt
-1. Open `module-10/test-prompt.md`.
-2. Copy **Prompt A** (the Driftwood site) or **Prompt B** (the Orbit Catch game) into Claude Code, unchanged.
-3. Watch for: a task plan table first, the design shell built by `claude-sonnet-builder` or `claude-opus-builder` (never by `agy`), page and script tasks built by Hydrogen high (split into mini-tasks where Opus can spec them exactly) and launched together, ONE Sonnet review per task (after all its mini-tasks), and a short final message. The main chat itself edits no project files and reads no full diff.
+## Step 3. Try it
+Start a new session in the project folder, choose Opus, and paste a prompt from `module-10/test-prompt.md` (**Prompt A**, the Driftwood site, or **Prompt B**, the Orbit Catch game), unchanged. Watch for: a task plan table first, the design shell built by `claude-sonnet-builder` or `claude-opus-builder` (never by `agy`), page and script tasks built by Hydrogen high (split into mini-tasks where Opus can spec them exactly) and launched together, ONE Sonnet review per task (after all its mini-tasks), and a short final message. The main chat itself edits no project files and reads no full diff.
 
 ## Approvals
 The installer adds an allow-list to `.claude/settings.json`: the runner script, read-only git commands and the `.m10/` run folder. So a run does not stop to ask for each launch. It also blocks reading `.env` files. The installer also asks one question: may Claude edit files in this folder without asking each time? Yes sets `"defaultMode": "acceptEdits"` in that file (`--accept-edits` on Mac or `-AcceptEdits` on Windows answers yes up front); no leaves every edit asking as usual. Never add `--dangerously-skip-permissions`.
@@ -225,10 +128,10 @@ Opus keeps score. From the 3rd reviewed Hydrogen-built task on, if more than 1 i
 
 ## When quota runs out
 - A drained model gets a marker file in `.claude/agy-quota/` with a reset time. If agy gives none, the script uses 6 hours from now (a guess). Opus skips it until then. Check with `scripts/agy-run.sh --status`. Delete a marker to clear it.
-- A drained Hydrogen build moves on by itself in the script: exact mini-tasks go Flash high, then Argon medium; bulk tasks go Argon medium, then Sonnet. Argon builds go Sonnet, then Opus.
-- **Quota facts are unconfirmed.** Google's docs list Hydrogen, Argon and Flash under one "Gemini Models" pool, so draining one may drain the others. The 6-hour reset in the markers is a guess. Markers are per model ID.
-- **Hydrogen, Argon and Flash all drained?** Everything that can still run (design, sensitive work, reviews, Claude fixes) runs; the remaining builds are held, and Opus asks you ONE question: **"Antigravity is drained for Hydrogen, Argon and Flash. Wait for the reset, or switch to Module 3?"** It never switches on its own.
-- **Only Hydrogen or only Flash drained?** No question: the chain above covers it and the report says which model ran.
+- A drained Hydrogen build moves on by itself in the script: exact mini-tasks go Flash high, then Argon medium; bulk tasks go Argon medium, then agy Sonnet. A fix task never falls back: the script forces `--no-fallback` for any task whose slug ends in `-r1` to `-r9`, so Flash or any other model never serves a fix. Argon builds go Sonnet, then Opus.
+- **Quota facts are unconfirmed.** Hydrogen, Argon and Flash may share one quota pool (unverified), so draining one may drain the others. The 6-hour reset in the markers is a guess. Markers are per model ID.
+- **Every model in the chain drained?** Bulk builds use the chain Hydrogen, Argon, agy Sonnet; exact mini-tasks use Hydrogen, Flash high, Argon. Everything that can still run (design, sensitive work, reviews, Claude fixes) runs; builds whose whole chain is drained are held, and Opus asks you ONE question naming only the models that were actually in that chain, for example **"Antigravity is drained for Hydrogen, Argon and Sonnet. Wait for the reset, or switch to Module 3?"** It never switches on its own.
+- **Only part of a chain drained?** No question: the chain above covers it and the report says which model ran.
 - **Module 3 mode.** Claude builds the rest, with no Antigravity. Opus scores each task, then picks `claude-haiku-builder` (easy), `claude-sonnet-builder` (normal and design) or `claude-opus-builder` (hardest). Read-only work goes to `scout`. Reviews use the same 400-line rule.
 
 # Part 3: Good to know
@@ -244,7 +147,7 @@ Opus keeps score. From the 3rd reviewed Hydrogen-built task on, if more than 1 i
 - **Hydrogen high does the bulk of the building** and Argon's small pool is kept for hard tasks and for taking over if Hydrogen keeps failing review.
 - **Design, sensitive builds, reviews and the Sonnet and Opus fix steps use your Claude plan**, not Google quota. Watch your Claude usage too.
 - **Review every diff.** File ownership is enforced by instructions, not the filesystem. Fallbacks can switch models mid-task.
-- **Unverified:** whether `agy` allows concurrent sessions, the real quota error text, whether the `effort` setting in the Claude agent files is honored, and whether the script flow works on Windows (the script is a bash script, so it likely needs Git Bash). The script was tested against a stand-in `agy`, not the real tool.
+- **Unverified:** whether starting `agy` from Claude opens the browser sign-in page (if not, Claude asks you to sign in in the Antigravity app), whether `agy` allows concurrent sessions, the real quota error text, whether the `effort` setting in the Claude agent files is honored, and whether the script flow works on Windows (the script is a bash script, so it likely needs Git Bash). The script was tested against a stand-in `agy`, not the real tool.
 - **After a context reset** the main chat re-reads `CLAUDE.md`, re-prints the plan with each task's status, and keeps delegating. It never carries on inline.
 - **Secrets stay out.** Copying, linking or reading `.env` files, keys or credentials makes Claude stop and ask, and sub-agents follow the same rule. Sub-agents may test migrations only on a local throwaway database.
 - **A summary always arrives**, even when all the work went to one sub-agent.

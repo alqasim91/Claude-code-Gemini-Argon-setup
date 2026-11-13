@@ -1,12 +1,12 @@
 Read this only when picking an agy effort level or model for a task that is not a plain Hydrogen build, or when editing the pool. Reference: `scripts/agy-run.sh` is the source of truth for aliases, effort suffixes and chains (the marked block at its top); keep CLAUDE.md in step.
 
-Model IDs confirmed from `agy models` (verified by the user). Each ID embeds effort. An alias takes a `-low`, `-medium` or `-high` suffix (`sonnet-high`), `hydrogen` also `-xhigh`; a full ID is used as given. The alias `hydrogen` alone means high; every other alias alone means medium.
+Model IDs confirmed from the user's `agy models` output on 2026-11-13, including `gemini-4-hydrogen-low`, `-medium`, `-high` and `-xhigh`. Real runs on the real tool are not done yet. Each ID embeds effort. An alias takes a `-low`, `-medium` or `-high` suffix (`sonnet-high`), `hydrogen` also `-xhigh`; a full ID is used as given. The alias `hydrogen` alone means high; every other alias alone means medium.
 
 # Antigravity models (run through `scripts/agy-run.sh`, on the Google AI Pro plan)
 
 | Alias | agy model ID | Use for | Quota notes |
 |---|---|---|---|
-| hydrogen | `gemini-4-hydrogen-high` (`-medium`, `-low`, `-xhigh` selectable) | **Default builder** for every non-design build task, split into exact mini-tasks or bulk. Fast and cheap, about Argon level on general and agentic work, weaker on terminal and long-horizon work. Always with a real `owns:` list. Fix step 1 for its own work. Never reviews | Unverified; may share the "Gemini Models" pool |
+| hydrogen | `gemini-4-hydrogen-high` (`-medium`, `-low`, `-xhigh` selectable) | **Default builder** for every non-design build task, split into exact mini-tasks or bulk. Scored about the same as Argon on one index (secondary source, unverified); reported weaker on terminal and long-horizon work. Always with a real `owns:` list. Fix step 1 for its own work. Never reviews | Unverified; may share one quota pool with Argon and Flash (unverified) |
 | argon | `gemini-4-argon-medium` (`-high` for the hardest, `-low` for trivial) | Hard tasks, long-horizon or terminal-heavy work, everything after a tripped safety switch. **Fix step 2 for Hydrogen- and Flash-built work** (medium) | Small pool; weekly |
 | flash (scout) | `gemini-3.8-flash-medium` (`-low` for pure lookups) | Scouting: file lookup, grep-style questions, summaries, extraction, formatting. Read-only | Unverified; nearly unlimited so far |
 | flash (build) | `gemini-3.8-flash-high` | Build **fallback** only: exact mini-tasks when Hydrogen is drained (`--exact`). Never fixes, never reviews, never design | As above |

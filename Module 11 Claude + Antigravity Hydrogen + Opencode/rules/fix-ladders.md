@@ -6,7 +6,7 @@ When a task fails review, send the defect list to the next step of the ladder fo
 | Built by | r1 | r2 | r3 | r4 | r5 |
 |---|---|---|---|---|---|
 | Hydrogen (also a task split across Hydrogen and OpenCode) | **Hydrogen high** (same, a fresh task: whole task diff + defect list) | **Argon medium** | agy Sonnet (medium) | agy Opus (medium) | record and continue |
-| OpenCode `build`, `mech` | same model (`--start`) | **Hydrogen high** (cheaper than Argon; skipped when drained or tripped) | **Argon medium** | agy Sonnet | agy Opus |
+| OpenCode `build`, `mech` | same model (`--start`) | **Hydrogen high** (skipped when drained or tripped) | **Argon medium** | agy Sonnet | agy Opus |
 | Flash (rare last-resort fallback) | **Hydrogen high** | **OpenCode `hard`** (a fresh task, owns all the task's files, `--private` if needed) | **Argon medium** | agy Sonnet | agy Opus |
 | Argon | same Argon | agy Sonnet | agy Opus | record and continue | |
 | OpenCode `hard` | same model (`--start`) | agy Sonnet | agy Opus | record and continue | |
@@ -16,7 +16,7 @@ When a task fails review, send the defect list to the next step of the ladder fo
 | `claude-haiku-builder` (tiny edit) | same agent | `claude-sonnet-builder` | `claude-opus-builder` | | |
 
 - Flash never fixes and never reviews. Never Argon high for fixes. Argon is a ladder step only, never a first build of a non-hard task.
-- Hydrogen high is the cheap second step for OpenCode-built work; when it is skipped the row is: same model, Argon medium, agy Sonnet, agy Opus (4 steps).
+- Hydrogen high is the second step for OpenCode-built work; when it is skipped the row is: same model, Argon medium, agy Sonnet, agy Opus (4 steps).
 - agy Sonnet and agy Opus are used only here. They never take a first build, a review, a scout or a design.
 - A fix of a split task is one task for the whole task, not per mini-task.
 - `--private` tasks keep `--private` in OpenCode fix rounds. A task routed as `opus-sensitive` follows the `claude-opus-builder` row.

@@ -6,8 +6,8 @@ Silent re-routes (Hydrogen -> OpenCode `build`, Argon -> OpenCode `hard`, OpenCo
 | Task | Held when |
 |---|---|
 | Hard (Routing 5) | Argon AND OpenCode `hard` both drained |
-| Splittable (Routing 6) | Hydrogen, OpenCode `build`/`mech` AND Flash (`flash-high`) all drained (a tripped pool with the other unavailable sends it to Argon medium; held only if Argon is drained too) |
-| Non-splittable (Routing 7) | Hydrogen AND OpenCode `build` both drained (Flash does not take it; a tripped pool with the other unavailable goes to Argon medium, held if Argon is drained too) |
+| Splittable (Routing 6) | Hydrogen, OpenCode `build`/`mech` AND Flash (`flash-high`) all drained (a tripped pool with the other unavailable sends it to Argon medium; Argon drained -> `flash-high` for exact pieces, then held) |
+| Non-splittable (Routing 7) | Hydrogen AND OpenCode `build` both drained (Flash does not take it; a tripped pool with the other unavailable goes to Argon medium; Argon drained -> held) |
 | Special input (Routing 4) | that OpenCode role drained |
 | Scouting (Routing 1) | OpenCode `scout` AND Flash scout both drained |
 

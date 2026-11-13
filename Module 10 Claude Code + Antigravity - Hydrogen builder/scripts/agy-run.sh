@@ -49,7 +49,7 @@
 # stop and report. Do not look for a way around it.
 set -euo pipefail
 
-RUN_DIR=".m10"                      # run folder in the project (briefs, logs, contract.md, TASKS.md, last-run.md)
+RUN_DIR=".m10"                      # run folder in the project (briefs, logs, contract.md, last-run.md)
 
 # ---- Flags (confirmed on the user's machine; `agy` has no -m flag) ----
 AGY_BIN="agy"
@@ -236,6 +236,10 @@ if [ "$FAMILY" = "flash" ]; then
     if [ "$ID" != "gemini-3.8-flash-high" ]; then note "Flash build forced to gemini-3.8-flash-high (asked: $MODEL)"; fi
     ID="gemini-3.8-flash-high"; EFFORT=high
   fi
+fi
+# A fix round (slug ends in -r1..-r9) never falls back: no other agy model (Flash included) may serve a fix.
+if [[ "$TASK" =~ -r[1-9]$ ]] && [ $NOFB -eq 0 ]; then
+  NOFB=1; note "fix task ($TASK): --no-fallback forced, no other model may serve a fix"
 fi
 if [ $EXACT -eq 1 ] && [ "$FAMILY" != "hydrogen" ]; then note "--exact only matters for hydrogen builds: ignored"; fi
 

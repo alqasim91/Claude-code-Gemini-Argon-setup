@@ -1,6 +1,6 @@
 # Module 11 test prompt
 
-Paste one prompt, unchanged, into a fresh Claude desktop app session in an empty folder with Module 11 installed (agy and opencode both signed in).
+Paste one prompt, unchanged, into a fresh Claude desktop app session in an empty folder with Module 11 installed (Antigravity signed in; OpenCode free models need no sign-in).
 
 ## Prompt A: Driftwood landing site
 
@@ -71,6 +71,6 @@ In a separate chat in the Claude desktop app on the same folder, ask Claude to r
 
 1. **Hydrogen drained.** `mkdir -p .claude/agy-quota && printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > .claude/agy-quota/gemini-4-hydrogen-high`. Expect: the plan shows the build tasks on OpenCode `build` with a "Hydrogen drained; silent re-route" line, and no question to you.
 2. **OpenCode build drained.** `mkdir -p .claude/opencode-quota && for m in deepseek-v4.1-flash-free glm-5.3-flash-free flint-40b-free beam-free big-pickle pulse-alpha-free crouton-alpha-free; do printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > ".claude/opencode-quota/$m"; done`. Expect: all builds stay on Hydrogen; nothing is held.
-3. **Everything drained.** Do both 1 and 2, plus `for m in gemini-4-hydrogen-medium gemini-3.8-flash-high gemini-3.8-flash-medium gemini-4-argon-medium gemini-4-argon-high claude-sonnet-5-5-medium claude-opus-5-5-medium; do printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > ".claude/agy-quota/$m"; done`. Expect: design and sensitive work still run on Claude, and Opus asks ONE question: wait for the reset, or switch to Module 3? It must not choose for you.
+3. **Everything drained.** Do both 1 and 2, plus the OpenCode `mech` chain model that is not in `build` (`mkdir -p .claude/opencode-quota && printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > .claude/opencode-quota/nemotron-3.5-lightning-free`; without it `mech` and `scout` still have a model), plus `for m in gemini-4-hydrogen-medium gemini-3.8-flash-high gemini-3.8-flash-medium gemini-4-argon-medium gemini-4-argon-high claude-sonnet-5-5-medium claude-opus-5-5-medium; do printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > ".claude/agy-quota/$m"; done`. Expect: design and sensitive work still run on Claude, and Opus asks ONE question: wait for the reset, or switch to Module 3? It must not choose for you.
 
 `scripts/agy-run.sh --status` should list the agy markers you set. When you are done, ask Claude to delete the marker files in `.claude/agy-quota/` and `.claude/opencode-quota/`.

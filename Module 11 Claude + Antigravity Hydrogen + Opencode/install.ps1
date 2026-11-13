@@ -343,7 +343,7 @@ Say ""
 Say "Module 11 is installed."
 if (-not $script:Changed) { Say "Nothing changed this time. It was already up to date." }
 Say "Next:"
-Say "  1. Sign in to agy and opencode if you have not yet (run each once)."
+Say "  1. Sign in to Antigravity with your Google AI Pro account if you have not yet (Claude tells you when it needs you to). OpenCode free models need no sign-in."
 Say "  2. Start a new session in the Claude desktop app, in this folder, and choose Opus."
 Say "  3. Paste a prompt from test-prompt.md."
 Say "Note: the two runner scripts are bash scripts. Claude Code on Windows uses Git Bash for them."

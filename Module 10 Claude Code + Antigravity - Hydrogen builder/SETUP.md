@@ -2,7 +2,7 @@
 
 You are setting up Module 10 Hydrogen builder (Claude Code + Antigravity) for a user who is not technical. Do the steps in order. Use plain, short sentences with the user. Run the commands yourself; do not ask the user to open a terminal unless a step says so. Setup is the one job you do yourself in this folder: do not build anything, do not start the user's project work, and do not read any `.env` file.
 
-1. Check the place. `module-10/install.sh` must exist here. If not, or if the folder looks wrong (for example the home folder), stop and tell the user to put `module-10-files.zip` in their project folder, open Claude Code there and paste the line again.
+1. Check the place. `module-10/install.sh` must exist here. If not, or if the folder looks wrong (for example the home folder), stop and tell the user to put `module-10-files.zip` in their project folder, open a new session of the Claude desktop app on that folder and paste the line again.
 
 2. Ask ONE plain question in the chat, no choice box, and wait: "While it works, Claude writes and changes files in this folder. Should it do that without asking you each time? Yes lets a run finish while you are away. No means you approve each change. You can change this later."
 
@@ -14,12 +14,12 @@ You are setting up Module 10 Hydrogen builder (Claude Code + Antigravity) for a 
 - "git is not installed": reviews need git. Mac: `xcode-select --install`. Windows: Git for Windows (git-scm.com).
 - "could not make the first commit": ask for a name and email, then run `git config user.name "<name>"` and `git config user.email "<email>"` (no `--global`) and `git add -A -- . ':(exclude,glob)**/.env*' && git commit -q -m start`.
 
-5. Outside tools. For each tool below, run `command -v <tool>`. Missing: say in one sentence what it is, ask "May I install it?". Yes: run the install command. No: give them the command, go on. Still missing: suggest a restart. Installed: run its check, 20 second timeout. You cannot sign in for the user (it opens a browser): if the check fails, hangs or lacks the models, give them the terminal steps and go on.
-- `agy`: Google's Antigravity, a builder. Needs a Google AI Pro plan. Install: Mac/Linux `curl -fsSL https://antigravity.google/cli/install.sh | bash`; Windows `powershell -c "irm https://antigravity.google/cli/install.ps1 | iex"`. Check: `agy models`, listing gemini-4-hydrogen-high, gemini-4-argon-medium, gemini-3.8-flash-high, gemini-3.8-flash-medium, claude-sonnet-5-5-medium, claude-opus-5-5-medium. Sign-in (user, in a terminal): `agy`, choose Google OAuth, sign in with the AI Pro account, quit, `agy models`.
+5. Outside tools. For each tool below, run `command -v <tool>`. Missing: say in one sentence what it is, ask "May I install it?". Yes: run the install command. No: give them the command, go on. Still missing: suggest a restart. Installed: run its check, 20 second timeout. You cannot sign in for the user: if the check fails, hangs or lacks the models, say which models are missing in plain words and go on. Never ask the user to open a terminal.
+- `agy`: Google's Antigravity, a builder. Needs a Google AI Pro plan. Install: Mac/Linux `curl -fsSL https://antigravity.google/cli/install.sh | bash`; Windows `powershell -c "irm https://antigravity.google/cli/install.ps1 | iex"`. Check: `agy models`, listing gemini-4-hydrogen-high, gemini-4-argon-medium, gemini-3.8-flash-high, gemini-3.8-flash-medium, claude-sonnet-5-5-medium, claude-opus-5-5-medium. Sign-in (UNVERIFIED, not yet tried on the real tool): if the check says not signed in, start `agy` yourself (20 second timeout, Google OAuth) so the sign-in page opens in the user's browser, tell the user in plain words to finish it with the Google AI Pro account, then run `agy models` again. If no browser opens or the check still fails, tell the user in plain words to open the Antigravity app and sign in there with the Google AI Pro account, then run `agy models` again. No terminal instructions.
 
 6. Check. Run `scripts/agy-run.sh --status` (expect `agy: 0 models limited`). `ls .claude/agents | wc -l` (7+) and `ls .claude/m10 | wc -l` (5+). Report in one line.
 
-7. Finish in at most 6 short lines: what is installed; what is left (sign-ins, rules to paste); START A NEW Claude Code session here (rules load at session start) and choose Opus; then they can paste a request or a test prompt from `module-10/test-prompt.md`; the `module-10` folder and zip can stay or go.
+7. Finish in at most 6 short lines: what is installed; what is left (sign-ins, rules to paste); START A NEW session in the Claude desktop app on this folder (rules load at session start) and choose Opus; then they can paste a request or a test prompt from `module-10/test-prompt.md`; the `module-10` folder and zip can stay or go.
 
 ## Rules
 - Never add `--dangerously-skip-permissions`, `--auto` or any flag that bypasses permissions.

@@ -23,11 +23,11 @@ After a context reset, compaction or resume: re-read this file, then every rule 
 Guards that hold even if a file is not read:
 - Hydrogen and Flash never review; Flash never fixes; no agy model reviews. A design task never goes to agy (not Hydrogen, Argon, Flash, agy Sonnet or Opus): never send one to `agy-run.sh`.
 - Hydrogen-built work is fixed by Hydrogen high (`--no-fallback`), then Argon medium, then `claude-sonnet-fixer`, then `claude-opus-builder`. Flash-built (fallback) work starts at Hydrogen high. Never Argon high or another agy model. Drained steps are skipped (`fix-ladders.md`).
-- Hydrogen drained on a build: the script falls back by itself (exact mini-tasks: Flash high, then Argon medium; others: Argon medium). No question. Module 3 never without the user's answer.
+- Hydrogen drained on a build: the script falls back by itself (exact mini-tasks: Flash high, then Argon medium; bulk: Argon medium, then agy Sonnet). Fix tasks (slug `-rN`) never fall back: the script forces `--no-fallback`. No question while any model in the chain still has quota. Module 3 never without the user's answer.
 - Safety switch: from the 3rd reviewed Hydrogen-built task, if more than 1 in 3 failed their first review (failed x 3 > reviewed), stop sending NEW tasks to Hydrogen for the rest of the run: they go to Argon medium.
 
 ## Who does what
-- **Hydrogen high** (`gemini-4-hydrogen-high`, alias `hydrogen`) is the default builder: every non-design build task, split into exact mini-tasks or bulk, through `agy-run.sh`, with no question to the user. Faster and cheaper than Argon, weaker on terminal and long-horizon work. `hydrogen-medium`, `-low`, `-xhigh` are selectable.
+- **Hydrogen high** (`gemini-4-hydrogen-high`, alias `hydrogen`) is the default builder: every non-design build task, split into exact mini-tasks or bulk, through `agy-run.sh`, with no question to the user. Scored about the same as Argon on one index (secondary source, unverified); reported weaker on terminal and long-horizon work. `hydrogen-medium`, `-low`, `-xhigh` are selectable.
 - **Argon** (`gemini-4-argon-medium`, `-high` for the hardest) takes hard tasks, tasks Hydrogen cannot carry, and all new builds after the safety switch trips. agy Sonnet or agy Opus take the tasks named in Routing. Never design.
 - **Flash** (`gemini-3.8-flash-*`) scouts (read-only) and is the build fallback for exact mini-tasks when Hydrogen is drained (`flash-high`, with a real `owns:`).
 - **Claude plan** (Agent tool): design builds (`claude-sonnet-builder` or `claude-opus-builder`, never agy), sensitive work (`claude-opus-builder`, judged by layer, Routing 2), tiny edits (`claude-haiku-builder`), all reviews, and the Claude fix steps. Agents: `claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer` (fixes Hydrogen- and Flash-built work only), `claude-haiku-builder`, `scout` (Module 3 mode only), `sonnet-reviewer`, `opus-reviewer` (table: `models.md`). Never the main session.
@@ -39,7 +39,7 @@ Run end to end. Never use AskUserQuestion or offer choice boxes like "Send this 
 - Defect found in a diff or test: send it back the same turn as a new delegation listing each defect (fix ladders). Up to 3 steps per task (4 for Hydrogen- and Flash-built work); if the last still fails review, record the defect and continue. Fix steps of different tasks are independent: launch them together.
 - Unclear spec or minor choice: pick the most reasonable option, note it in `.m10/last-run.md`, keep going. Ambiguous specs and architecture decisions are decided by Opus in the plan (reasoning only); the decision goes into the briefs. Cosmetic or out-of-spec gaps (e.g. a missing extra the spec never asked for) are listed, not sent back, unless they break an acceptance criterion.
 - Stop and ask only for hard blockers: login failure, `agy` missing, a permission block, a Claude plan limit hit, or an action that deletes data or touches secrets (copying, linking or reading env files, keys, credentials, even for a worktree). Builders follow the same rule (AGENTS.md, agent files). A suspected concurrency error is not a hard blocker.
-- One exception to "no questions", about drained pools: "Antigravity is drained for Hydrogen, Argon and Flash. Wait for the reset, or switch to Module 3?" (`drained-pools.md`). Nothing else is asked, and no route changes without the user's answer.
+- One exception to "no questions", about drained pools: "Antigravity is drained for <the models that were in the chain>. Wait for the reset, or switch to Module 3?" (`drained-pools.md`). Nothing else is asked, and no route changes without the user's answer.
 - Always finish with the final summary, even when every task went to one builder.
 
 ## Secrets and databases
@@ -71,10 +71,10 @@ Run end to end. Never use AskUserQuestion or offer choice boxes like "Send this 
 | flash (read-only scout) | argon (low) | stop and tell the user |
 | flash (build, always high) | argon (medium) | - |
 
-- **No-fallback mode** (`--no-fallback`): same-model fix rounds (Hydrogen high fixing Hydrogen-built work) and Argon medium fixing Hydrogen- or Flash-built work. A drained model returns exit 3 `drained: <model-id>, no fallback`. Other errors (login, unknown flag, timeout, suspected concurrency) never fall back.
-- Markers: `.claude/agy-quota/<model-id>`, written atomically by the script (`until=` reset time, else now + 6 hours, a guess; `reason=`). Before planning and before each wave run `scripts/agy-run.sh --status`, skip models with an active marker, route to the chain's next model and say so in the plan. Clear a model by deleting its marker. If everything looks drained, ask the user to run `/usage` inside `agy`. Module 5's single quota-state file in `.claude/` is ignored if still present; delete it.
-- Marker ids: Hydrogen `gemini-4-hydrogen-high` (builds); Flash `gemini-3.8-flash-high` (fallback builds) / `-medium` (scouting); Argon `gemini-4-argon-medium`. Quota pool facts are unconfirmed (Hydrogen, Argon and Flash may share one "Gemini Models" pool); markers are per model ID.
-- **Hydrogen, Argon and Flash all drained** (fresh markers on `gemini-4-hydrogen-high`, `gemini-3.8-flash-high` and `gemini-4-argon-medium`, or the matching exit 3 results) triggers `drained-pools.md`. One or two of them drained is not that: the chain covers it. **Argon drained** (for fix routing): a fresh `gemini-4-argon-medium` marker, or exit 3 `drained: gemini-4-argon-medium, no fallback`.
+- **No-fallback mode** (`--no-fallback`, forced by the script for any slug ending in `-r1`..`-r9`): same-model fix rounds (Hydrogen high fixing Hydrogen-built work) and Argon medium fixing Hydrogen- or Flash-built work. A drained model returns exit 3 `drained: <model-id>, no fallback`. Other errors (login, unknown flag, timeout, suspected concurrency) never fall back.
+- Markers: `.claude/agy-quota/<model-id>`, written atomically by the script (`until=` reset time, else now + 6 hours, a guess; `reason=`). Before planning and before each wave run `scripts/agy-run.sh --status`, skip models with an active marker, route to the chain's next model and say so in the plan. Clear a model by deleting its marker. If everything looks drained, tell the user in plain words and ask them to check their Antigravity usage in the Antigravity app. Any older single quota-state file in `.claude/` (from an earlier module) is ignored if still present.
+- Marker ids: Hydrogen `gemini-4-hydrogen-high` (builds); Flash `gemini-3.8-flash-high` (fallback builds) / `-medium` (scouting); Argon `gemini-4-argon-medium`. Quota pool facts are unconfirmed (Hydrogen, Argon and Flash may share one quota pool (unverified)); markers are per model ID.
+- **Whole chain drained** triggers `drained-pools.md`: for a bulk build, fresh markers on `gemini-4-hydrogen-high`, `gemini-4-argon-medium` and `claude-sonnet-5-5-medium`; for an exact mini-task, on `gemini-4-hydrogen-high`, `gemini-3.8-flash-high` and `gemini-4-argon-medium` (or the matching exit 3 results). Part of a chain drained is not that: the rest of the chain covers it. **Argon drained** (for fix routing): a fresh `gemini-4-argon-medium` marker, or exit 3 `drained: gemini-4-argon-medium, no fallback`.
 
 ## Hydrogen builds (the default route for every non-design build)
 - **Exact-spec tasks: split** into mini-tasks, 4 by default, more if needed. Ids `<task-id>-m1`, `-m2`... Each owns a disjoint subset of the task's files; mini-tasks touching the same file run one after another (`after`). Bulk tasks stay one task.
@@ -144,7 +144,7 @@ scripts/agy-run.sh --model <alias[-low|-medium|-high]> --task <slug> --owns "<co
 | 0 | success, report printed | review |
 | 1 | other error (login, crash, timeout, unknown flag); no fallback, no retry loop | login failure or permission block: hard blocker, stop and ask. Otherwise decide from the quoted error |
 | 2 | `agy` missing, bad arguments, refused, or model id not in `agy models` | refused or bad call: a routing mistake, fix the call. `agy` missing: hard blocker, tell the user |
-| 3 | first line `drained: <model-id>, no fallback`, or `drained: all models drained or unavailable (tried: ...)`; owned files may be partly edited | no-fallback: any fix -> next step of its ladder. Chain exhausted (Hydrogen, Flash, Argon all out) -> `drained-pools.md` |
+| 3 | first line `drained: <model-id>, no fallback`, or `drained: all models drained or unavailable (tried: ...)`; owned files may be partly edited | no-fallback: any fix -> next step of its ladder. Chain exhausted (every model in the task's chain out) -> `drained-pools.md` |
 | 4 | `concurrency: <text>`, no marker | lower the total cap by 1, relaunch, note it |
 
 The report lists `fallbacks:` (each one and why, quoted error), `changed lines (owned)`, the diff stat and outside-owned changes.
@@ -172,4 +172,4 @@ Reviewer by changed lines. Changed lines = added + removed from `git diff --nums
 |---|---|---|---|---|---|---|---|---|
 
 ## If everything fails
-Only when `agy` itself is broken, the Claude plan is out of quota, or Hydrogen, Argon and Flash are drained and the user has not answered: stop and tell the user. Do none of the work yourself, not even a small part: the main session never implements.
+Only when `agy` itself is broken, the Claude plan is out of quota, or the whole chain of a build (Hydrogen, Argon, Flash or agy Sonnet, as the chain goes) is drained and the user has not answered: stop and tell the user. Do none of the work yourself, not even a small part: the main session never implements.
