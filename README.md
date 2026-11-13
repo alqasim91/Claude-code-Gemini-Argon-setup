@@ -20,6 +20,7 @@ Setup guides and ready-to-copy files for running Claude Code (Opus) as the plann
 | Module 7: Claude Code + Codex (parallel) | Claude Pro + a ChatGPT plan with Codex | Opus plans in phases. Luna, Terra and Sol build several tasks at once through `codex exec` on a ChatGPT plan. No relay subagent, graded reviews, three fix rounds, quota fallback. | [Module 7 Claude code + Codex](<Module 7 Claude code + Codex>) |
 | Module 8: Claude Code + OpenCode free models (parallel) | Claude Pro (OpenCode free models need no plan) | Opus plans in phases. Ten free OpenCode models build tasks at once through `opencode run`; the script falls back to the next model when one hits its free limit. Zero-retention models for private code, graded reviews, four fix rounds, Module 3 fallback. | [Module 8 Claude + Opencode Free](<Module 8 Claude + Opencode Free>) |
 | Module 9: Claude + Antigravity + OpenCode (parallel) | Claude Pro + Google AI Pro (OpenCode is free) | Combines Module 6 Flash builder and Module 8. Outside models run from scripts, with no relay agent. Flash builds exact mini-tasks first, OpenCode free models take over silently when Flash is drained (and handle scouting, images, big inputs), Argon only takes hard tasks and Flash fixes. Claude plan designs, reviews and fixes. Module 3 fallback. | [Module 9 Claude + Antigravity + Opencode](<Module 9 Claude + Antigravity + Opencode>) |
+| Module 11: Claude + Antigravity Hydrogen + OpenCode (parallel) | Claude Pro + Google AI Pro (OpenCode free models need no plan) | Module 9 with Gemini 4 Hydrogen as the default builder (fast, cheaper than Argon) for exact mini-tasks and bulk work. OpenCode free models are the overflow and fallback and handle scouting, images and big inputs. Argon only takes hard tasks and a fix step; Flash is a scout fallback. Claude plan designs, reviews and fixes. Module 3 fallback. | [Module 11 Claude + Antigravity Hydrogen + Opencode](<Module 11 Claude + Antigravity Hydrogen + Opencode>) |
 
 Open the module's `README.md` for the step-by-step setup on Mac and Windows, and `test-prompt.md` for a ready test prompt. Every module can be set up from inside Claude Code: drop its zip into your project folder and paste one line (see the module's README). A one-command installer is there too.
 
@@ -96,5 +97,18 @@ Module 9 Claude + Antigravity + Opencode/
   scripts/agy-run.sh                    agy runner (go to scripts/, chmod +x)
   scripts/opencode-run.sh               OpenCode runner (go to scripts/, chmod +x)
   module-9-files.zip                    the same files, zipped
+  test-prompt.md
+Module 11 Claude + Antigravity Hydrogen + Opencode/
+  README.md                             steps and how it works
+  CLAUDE.md                             routing rules (project root)
+  AGENTS.md                             shared rules for all builders (project root)
+  install.sh / install.ps1              one-command installer (Mac, Linux, Windows)
+  SETUP.md                              setup steps Claude Code follows
+  settings.json                         approvals list (merged into .claude/settings.json)
+  agents/                               7 subagents (go to .claude/agents/)
+  rules/                                5 on-demand rule files (go to .claude/m11/)
+  scripts/agy-run.sh                    agy runner (go to scripts/, chmod +x)
+  scripts/opencode-run.sh               OpenCode runner (go to scripts/, chmod +x)
+  module-11-files.zip                   the same files, zipped
   test-prompt.md
 ```
