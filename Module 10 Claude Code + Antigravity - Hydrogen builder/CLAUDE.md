@@ -29,7 +29,7 @@ Guards that hold even if a file is not read:
 ## Who does what
 - **Hydrogen high** (`gemini-4-hydrogen-high`, alias `hydrogen`) is the default builder: every non-design build task, split into exact mini-tasks or bulk, through `agy-run.sh`, with no question to the user. Scored about the same as Argon on one index (secondary source, unverified); reported weaker on terminal and long-horizon work. `hydrogen-medium`, `-low`, `-xhigh` are selectable.
 - **Argon** (`gemini-4-argon-medium`, `-high` for the hardest) takes hard tasks, tasks Hydrogen cannot carry, and all new builds after the safety switch trips. agy Sonnet or agy Opus take the tasks named in Routing. Never design.
-- **Flash** (`gemini-3.8-flash-*`) scouts (read-only) and is the build fallback for exact mini-tasks when Hydrogen is drained (`flash-high`, with a real `owns:`).
+- **Flash** (`gemini-3.8-flash-*`) scouts (read-only) and is the build fallback for exact mini-tasks when Hydrogen is drained (`flash-high`, reached only through `--model hydrogen --exact`, never launched directly).
 - **Claude plan** (Agent tool): design builds (`claude-sonnet-builder` or `claude-opus-builder`, never agy), sensitive work (`claude-opus-builder`, judged by layer, Routing 2), tiny edits (`claude-haiku-builder`), all reviews, and the Claude fix steps. Agents: `claude-sonnet-builder`, `claude-opus-builder`, `claude-sonnet-fixer` (fixes Hydrogen- and Flash-built work only), `claude-haiku-builder`, `scout` (Module 3 mode only), `sonnet-reviewer`, `opus-reviewer` (table: `models.md`). Never the main session.
 - **Reviews** ONCE per task (see Review), on the Claude plan; every task that edits files gets one. **Fixes:** fix ladders. **Pools drained?** Opus asks the user one question, only when it truly needs one (`drained-pools.md`); it never switches to Module 3 on its own.
 Independent tasks run in parallel, in waves, on disjoint files.
@@ -69,7 +69,6 @@ Run end to end. Never use AskUserQuestion or offer choice boxes like "Send this 
 | sonnet | argon | opus |
 | opus | sonnet | argon (high) |
 | flash (read-only scout) | argon (low) | stop and tell the user |
-| flash (build, always high) | argon (medium) | - |
 
 - **No-fallback mode** (`--no-fallback`, forced by the script for any slug ending in `-r1`..`-r9`): same-model fix rounds (Hydrogen high fixing Hydrogen-built work) and Argon medium fixing Hydrogen- or Flash-built work. A drained model returns exit 3 `drained: <model-id>, no fallback`. Other errors (login, unknown flag, timeout, suspected concurrency) never fall back.
 - Markers: `.claude/agy-quota/<model-id>`, written atomically by the script (`until=` reset time, else now + 6 hours, a guess; `reason=`). Before planning and before each wave run `scripts/agy-run.sh --status`, skip models with an active marker, route to the chain's next model and say so in the plan. Clear a model by deleting its marker. If everything looks drained, tell the user in plain words and ask them to check their Antigravity usage in the Antigravity app. Any older single quota-state file in `.claude/` (from an earlier module) is ignored if still present.
@@ -136,7 +135,7 @@ design                  (optional, bare line, Claude design builders only)
 ```
 scripts/agy-run.sh --model <alias[-low|-medium|-high]> --task <slug> --owns "<comma list|none>" --brief .m10/briefs/<slug>.md [--exact] [--no-fallback] [--worktree <path>]
 ```
-  Aliases: `hydrogen` (= high; `hydrogen-medium`, `-low`, `-xhigh`), `flash` / `flash-low` (read-only scouting), `flash-high` (build, rare), `argon` / `argon-high` / `argon-low`, `sonnet`, `opus`. `--exact` marks an exact mini-task (lets the chain use Flash high). Not executable: `bash scripts/agy-run.sh ...`. Never add `--dangerously-skip-permissions` (auto mode blocks it). Wait for completion notifications, never poll; never start the next wave early.
+  Aliases: `hydrogen` (= high; `hydrogen-medium`, `-low`, `-xhigh`), `flash` / `flash-low` (read-only scouting), `flash-high` (fallback only, not launched directly: the script refuses it as a first choice; it is reached only through `--model hydrogen --exact`), `argon` / `argon-high` / `argon-low`, `sonnet`, `opus`. `--exact` marks an exact mini-task (lets the chain use Flash high as its fallback). A Flash build given as the first choice exits 2: "Flash builds only as the fallback of --model hydrogen --exact". Not executable: `bash scripts/agy-run.sh ...`. Never add `--dangerously-skip-permissions` (auto mode blocks it). Wait for completion notifications, never poll; never start the next wave early.
 - A fix task keeps the original `owns:` and is named `<id>-r1` / `-r2` / `-r3` / `-r4` (`fix-ladders.md`).
 
 | Exit | `agy-run.sh` | Main session does |

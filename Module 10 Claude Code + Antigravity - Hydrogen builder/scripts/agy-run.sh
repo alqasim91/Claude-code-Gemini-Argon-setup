@@ -17,14 +17,14 @@
 # follow it.", the read-only line and the no-shell line. A design task must never be sent here (CLAUDE.md rule;
 # the script also refuses a brief whose first line is the bare word "design").
 # --model missing = hydrogen (the default builder, high effort). --task missing = a generated slug (said in the report). --owns missing = the run
-# goes ahead unscoped and the report says so (a Flash call without --owns is a read-only scout).
+# goes ahead unscoped and the report says so (a Flash call without --owns is a read-only scout; a Flash build as first choice is refused).
 # Hydrogen = gemini-4-hydrogen-<low|medium|high|xhigh>. The alias `hydrogen` means high; `hydrogen-medium`,
 # `hydrogen-low`, `hydrogen-xhigh` pick another effort. Every other alias defaults to medium.
 #
 # Exit codes:
 #   0 success (report printed)
 #   1 other error: login, crash, timeout, unknown flag (last 20 log lines printed). No fallback
-#   2 agy missing, bad arguments, refused (design, Flash fix), or every model unavailable / not in `agy models`
+#   2 agy missing, bad arguments, refused (design, Flash fix, Flash build as first choice), or every model unavailable / not in `agy models`
 #   3 drained. First line "drained: <model-id>, no fallback" (--no-fallback) or
 #     "drained: all models drained or unavailable (tried: ...)" when the chain is used up, or
 #     "drained: max fallbacks reached ..." Owned files may be partly edited (the report shows them)
@@ -69,7 +69,7 @@ CONC_RE='concurrent|too many sessions|another session|already running|locked'
 # Alias -> agy model id. A -low / -medium / -high suffix on the alias picks the effort (default medium):
 #   hydrogen -> gemini-4-hydrogen-<effort> (default high; also xhigh)
 #   argon -> gemini-4-argon-<effort>   sonnet -> claude-sonnet-5-5-<effort>   opus -> claude-opus-5-5-<effort>
-#   flash -> gemini-3.8-flash-<effort> (scouting; a Flash BUILD is always gemini-3.8-flash-high, see below)
+#   flash -> gemini-3.8-flash-<effort> (read-only scouting only; Flash builds only as the fallback gemini-3.8-flash-high, never a first choice)
 #   A -xhigh suffix exists for hydrogen only (other families: the id is checked against `agy models`).
 # A full model id is used as given (no chain, except that a known family id behaves like its alias).
 alias_family() {   # $1 alias word (no suffix); prints the family or returns 1
@@ -88,7 +88,7 @@ family_id() {      # $1 family  $2 effort
 #   hydrogen (exact mini-task, --exact) -> flash-high -> argon.   hydrogen (not exact) -> argon -> sonnet.
 #   hydrogen (read-only) -> argon.   Flash is never a fallback for work that is not an exact mini-task.
 #   argon -> sonnet -> opus.  sonnet -> argon -> opus.  opus -> sonnet -> argon-high.
-#   A read-only Flash scout: flash -> argon-low -> stop.  A Flash build (always high): flash-high -> argon.
+#   A read-only Flash scout: flash -> argon-low -> stop.  A Flash build as first choice is refused (exit 2); flash-high is reached only through hydrogen --exact.
 # Argon high is never in a chain after Hydrogen or Flash.
 chain_after() {    # $1 family  $2 readonly(0|1)  $3 exact(0|1)
   case "$1:$2:$3" in
@@ -99,7 +99,6 @@ chain_after() {    # $1 family  $2 readonly(0|1)  $3 exact(0|1)
     sonnet:*)     echo "argon opus" ;;
     opus:*)       echo "sonnet argon-high" ;;
     flash:1:*)    echo "argon-low" ;;
-    flash:0:*)    echo "argon" ;;
     *)            echo "" ;;
   esac
 }
@@ -232,9 +231,8 @@ if [ "$FAMILY" = "flash" ]; then
   # Flash never fixes or reviews.
   if [[ "$TASK" =~ -r[1-9]$ ]]; then die "refused: Flash never fixes or reviews (slug $TASK looks like a fix round)"; fi
   if [ $READONLY -eq 0 ]; then
-    # Flash build: always high effort, whatever was asked. Its chain is argon (medium) unless --no-fallback.
-    if [ "$ID" != "gemini-3.8-flash-high" ]; then note "Flash build forced to gemini-3.8-flash-high (asked: $MODEL)"; fi
-    ID="gemini-3.8-flash-high"; EFFORT=high
+    # Flash builds only as the fallback of hydrogen --exact (chain_after), never as a first choice.
+    die "refused: Flash builds only as the fallback of --model hydrogen --exact (use --owns none for a read-only Flash scout)"
   fi
 fi
 # A fix round (slug ends in -r1..-r9) never falls back: no other agy model (Flash included) may serve a fix.

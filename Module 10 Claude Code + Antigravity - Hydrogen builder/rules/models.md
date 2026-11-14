@@ -9,7 +9,7 @@ Model IDs confirmed from the user's `agy models` output on 2026-11-13, including
 | hydrogen | `gemini-4-hydrogen-high` (`-medium`, `-low`, `-xhigh` selectable) | **Default builder** for every non-design build task, split into exact mini-tasks or bulk. Scored about the same as Argon on one index (secondary source, unverified); reported weaker on terminal and long-horizon work. Always with a real `owns:` list. Fix step 1 for its own work. Never reviews | Unverified; may share one quota pool with Argon and Flash (unverified) |
 | argon | `gemini-4-argon-medium` (`-high` for the hardest, `-low` for trivial) | Hard tasks, long-horizon or terminal-heavy work, everything after a tripped safety switch. **Fix step 2 for Hydrogen- and Flash-built work** (medium) | Small pool; weekly |
 | flash (scout) | `gemini-3.8-flash-medium` (`-low` for pure lookups) | Scouting: file lookup, grep-style questions, summaries, extraction, formatting. Read-only | Unverified; nearly unlimited so far |
-| flash (build) | `gemini-3.8-flash-high` | Build **fallback** only: exact mini-tasks when Hydrogen is drained (`--exact`). Never fixes, never reviews, never design | As above |
+| flash (build) | `gemini-3.8-flash-high` | Build **fallback** only, not launched directly (the script refuses it as a first choice): exact mini-tasks when Hydrogen is drained (`--model hydrogen --exact`). Never fixes, never reviews, never design | As above |
 | sonnet | `claude-sonnet-5-5-medium` (`-low` for trivial) | Non-design tasks that need Claude-style judgment: nuanced edits, careful refactors, writing/docs | Small pool |
 | opus | `claude-opus-5-5-medium` (`-high`, `-low` also exist) | Hard multi-file or architecture-heavy implementation only | Smallest pool; spend rarely |
 

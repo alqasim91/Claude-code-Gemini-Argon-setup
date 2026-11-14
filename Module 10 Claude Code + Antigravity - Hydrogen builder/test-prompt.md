@@ -78,7 +78,7 @@ mkdir -p .claude/agy-quota
 printf 'until=2099-01-01T00:00:00Z\nreason=test\n' > .claude/agy-quota/gemini-4-hydrogen-high
 ```
 
-Paste Prompt A. `scripts/agy-run.sh --status` should list the marker. The plan still launches `--model hydrogen`; the report of each run shows `fallbacks: skipped: marker on gemini-4-hydrogen-high` and `model that ran: gemini-3.8-flash-high` for exact mini-tasks (Argon medium for bulk tasks). No question to you. A failed review should start at Argon medium (`-r2`).
+Paste Prompt A. `scripts/agy-run.sh --status` should list the marker. The plan still launches `--model hydrogen` (never `--model flash-high` directly; Flash is a fallback only); the report of each run shows `fallbacks: skipped: marker on gemini-4-hydrogen-high` and `model that ran: gemini-3.8-flash-high` for exact mini-tasks (Argon medium for bulk tasks). No question to you. A failed review should start at Argon medium (`-r2`).
 
 Then drain all three build pools and paste Prompt A again:
 
